@@ -1389,32 +1389,32 @@ function makeBench(x, z, rotY, sitRot) {
   var wood = new THREE.MeshStandardMaterial({ color: 0x7a5a38, roughness: 1 });
   var wood2 = new THREE.MeshStandardMaterial({ color: 0x8f6c42, roughness: 1 });
   [-0.7, 0.7].forEach(function(lx) {
-    var leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, 0.5), wood);
-    leg.position.set(lx, 0.22, 0); g.add(leg);
-    var back = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.75, 0.1), wood);
-    back.position.set(lx, 0.6, -0.24); g.add(back);
+    var leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.28, 0.5), wood);
+    leg.position.set(lx, 0.14, 0); g.add(leg);
+    var back = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.52, 0.1), wood);
+    back.position.set(lx, 0.4, -0.24); g.add(back);
   });
   var seat = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.09, 0.55), wood2);
-  seat.position.y = 0.47; g.add(seat);
+  seat.position.y = 0.295; g.add(seat);
   var backrest = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.28, 0.07), wood2);
-  backrest.position.set(0, 0.82, -0.26); g.add(backrest);
+  backrest.position.set(0, 0.6, -0.26); g.add(backrest);
   g.position.set(x, 0, z);
   g.rotation.y = rotY;
   scene.add(g);
-  var spot = { x: x, y: 0.42, z: z, r: sitRot, type: "sit" };
+  var spot = { x: x, y: 0.25, z: z, r: sitRot, type: "sit" };
   INTERACT.push(spot);
   g.traverse(function(o) { if (o.isMesh) { o.userData.sit = spot; hitMeshes.push(o); } });
   return g;
 }
 function makeStool(x, z, sitRot) {
-  var spot = { x: x, y: 0.4, z: z, r: sitRot, type: "sit" };
+  var spot = { x: x, y: 0.23, z: z, r: sitRot, type: "sit" };
   INTERACT.push(spot);
-  var st = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.3, 0.44, 10), new THREE.MeshStandardMaterial({ color: 0x6e5133, roughness: 1 }));
-  st.position.set(x, 0.22, z);
+  var st = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.3, 0.27, 10), new THREE.MeshStandardMaterial({ color: 0x6e5133, roughness: 1 }));
+  st.position.set(x, 0.135, z);
   st.userData.sit = spot;
   scene.add(st); hitMeshes.push(st);
   var top = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.04, 10), new THREE.MeshStandardMaterial({ color: 0xa8834f, roughness: 1 }));
-  top.position.set(x, 0.45, z);
+  top.position.set(x, 0.285, z);
   top.userData.sit = spot;
   scene.add(top); hitMeshes.push(top);
 }
@@ -2382,7 +2382,8 @@ var CHIBI_MODELS = {
 };
 function chibiSitDY(spot) {
   if (!CHIBI.on || !spot) return 0;
-  return spot.type === "kneel" ? -0.19 : -0.26;
+  if (spot.type === "kneel") return (CHIBI.actions && CHIBI.actions.kneel) ? 0.05 : -0.19;
+  return -0.26;
 }
 function loadChibiModel(g) {
   var M = CHIBI_MODELS[g];
