@@ -625,13 +625,14 @@ function plopSfx() {
 }
 
 function standUp() {
+  if (typeof CHIBI !== "undefined" && CHIBI.on && (SITTING || KNEELING)) { var ec = (KNEELING && CHIBI.actions && CHIBI.actions.unkneel) ? "unkneel" : "stand"; CHIBI.exitClip = ec; CHIBI.standAnimT = ec === "unkneel" ? 1.0 : 1.4; if (typeof setChibiAnim === "function") setChibiAnim(ec); }
   SITTING = null; KNEELING = null;
   if (avatar) { avatar.position.y = 0; avatar.rotation.x = 0; }
 }
 function kneelOn(spot) {
   if (!spot || !avatar) return;
   KNEELING = spot;
-  avatar.position.set(spot.x, spot.y, spot.z);
+  avatar.position.set(spot.x, spot.y + (typeof chibiSitDY === "function" ? chibiSitDY(spot) : 0), spot.z);
   avatar.rotation.y = spot.r;
   avatar.rotation.x = 0.1;
   toast("🙏 Quỳ trước Phật — bấm Gõ mõ để tĩnh tâm");
@@ -690,6 +691,7 @@ function spawnPellet(x, z, i) {
   PELLETS.push({ m: m, age: 0 });
 }
 function feedFish() {
+  if (typeof CHIBI !== "undefined" && CHIBI.on) { CHIBI.actAnim = "act"; CHIBI.actT = 3.8; if (typeof setChibiAnim === "function") setChibiAnim("act"); }
   if (FEED_CD > 0 || !avatar || SITTING || KNEELING) return;
   FEED_CD = 30;
   var dx = -6.4 - avatar.position.x, dz = 15.2 - avatar.position.z;
@@ -2081,6 +2083,7 @@ function buildBuddha() {
       var bytes = new Uint8Array(bin.length);
       for (var bi2 = 0; bi2 < bin.length; bi2++) bytes[bi2] = bin.charCodeAt(bi2);
       new THREE.GLTFLoader().parse(bytes.buffer, "", function(gltf) {
+
         var o = gltf.scene;
         var goldM = new THREE.MeshStandardMaterial({ color: 0xd8af37, metalness: 0.35, roughness: 0.42 });
         o.traverse(function(c) { if (c.isMesh) c.material = goldM; });
@@ -2363,11 +2366,133 @@ function buildAvatar() {
   tag.scale.set(1.15, 0.29, 1);
   tag.position.y = 1.98;
   avatar.add(tag);
+  avatar.traverse(function(c) { if (c.isMesh) c.userData.prim = true; });
   avatar.position.set(0, 0, 24.6);
   scene.add(avatar);
+  if (typeof attachChibi === "function") attachChibi();
 }
 </script>
 <script>
+/* ================= NHAN VAT CHIBI 3D (model cua Nhien) ================= */
+var CHIBI_SCALE = 1.5;
+var CHIBI = { on: false, mixer: null, actions: null, hips: null, hipsBind: { x: 0, z: 0 }, cur: "", standT: 0, standAnimT: 0, idleT: 0, idleSeed: 6, angryT: 0, debugAnim: "", actT: 0, actAnim: "" };
+var CHIBI_MODELS = {
+  nam: { chunks: ["boy-model-1.js", "boy-model-2.js", "boy-model-3.js", "boy-model-4.js", "boy-model-5.js", "boy-model-6.js", "boy-model-7.js", "boy-model-8.js", "boy-model-9.js", "boy-model-10.js"], prefix: "__BOY_B64_", clips: { idle: "Holding_Idle", idle2: "Angry", walk: "Standard_Walk", sit: "Sitting", stand: "Sit_To_Stand", act: "Rummaging", kneel: "Stand_To_Kneel", unkneel: "Kneel_To_Stand" }, root: null, mixer: null, actions: null, hips: null, hipsBind: { x: 0, z: 0 }, loading: false },
+  nu: { chunks: ["girl-model-1.js", "girl-model-2.js", "girl-model-3.js", "girl-model-4.js", "girl-model-5.js", "girl-model-6.js", "girl-model-7.js", "girl-model-8.js", "girl-model-9.js", "girl-model-10.js", "girl-model-11.js", "girl-model-12.js", "girl-model-13.js", "girl-model-14.js", "girl-model-15.js"], prefix: "__GIRL_B64_", clips: { idle: "Sad_Idle", idle2: "Angry", walk: "Walking", sit: "Stand_To_Sit", stand: "Sit_To_Stand", act: "Rummaging", kneel: "Stand_To_Kneel", unkneel: "Kneel_To_Stand" }, root: null, mixer: null, actions: null, hips: null, hipsBind: { x: 0, z: 0 }, loading: false }
+};
+function chibiSitDY(spot) {
+  if (!CHIBI.on || !spot) return 0;
+  return spot.type === "kneel" ? -0.19 : -0.26;
+}
+function loadChibiModel(g) {
+  var M = CHIBI_MODELS[g];
+  if (!M || M.loading || M.root) return;
+  M.loading = true;
+  var i = 0;
+  function next() {
+    if (i >= M.chunks.length) { decodeChibi(g); return; }
+    var sc = document.createElement("script");
+    sc.src = M.chunks[i]; i++;
+    sc.onload = next;
+    sc.onerror = function() { M.loading = false; retryChibi(g); };
+    document.head.appendChild(sc);
+  }
+  next();
+}
+function decodeChibi(g) {
+  var M = CHIBI_MODELS[g];
+  try {
+    var b64 = "";
+    for (var k = 1; k <= M.chunks.length; k++) b64 += window[M.prefix + k] || "";
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var bi = 0; bi < bin.length; bi++) bytes[bi] = bin.charCodeAt(bi);
+    new THREE.GLTFLoader().parse(bytes.buffer, "", function(gltf) {
+      var root = gltf.scene;
+      root.scale.setScalar(CHIBI_SCALE);
+      root.traverse(function(c) { if (c.isMesh) c.frustumCulled = false; });
+      var mixer = new THREE.AnimationMixer(root);
+      var actions = {};
+      gltf.animations.forEach(function(clip) {
+        var canon = null;
+        Object.keys(M.clips).forEach(function(k) { if (M.clips[k] === clip.name) canon = k; });
+        if (!canon) return;
+        var a = mixer.clipAction(clip);
+        if (canon === "sit" || canon === "stand" || canon === "kneel" || canon === "unkneel") { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; }
+        actions[canon] = a;
+      });
+      var hips = null;
+      root.traverse(function(c) { if (c.isBone && c.name.indexOf("Hips") >= 0) hips = c; });
+      M.root = root; M.mixer = mixer; M.actions = actions; M.hips = hips;
+      M.hipsBind = hips ? { x: hips.position.x, z: hips.position.z } : { x: 0, z: 0 };
+      M.loading = false;
+      if (myGender() === g) attachChibi();
+    }, function() { M.loading = false; retryChibi(g); });
+  } catch (e) { M.loading = false; retryChibi(g); }
+}
+function retryChibi(g) {
+  var M = CHIBI_MODELS[g];
+  if (!M || M.root) return;
+  M.retries = (M.retries || 0) + 1;
+  if (M.retries <= 4) setTimeout(function() { loadChibiModel(g); }, 2500);
+}
+function attachChibi() {
+  if (!avatar) return;
+  var M = CHIBI_MODELS[myGender()];
+  if (!M) { CHIBI.on = false; CHIBI.mixer = null; return; }
+  if (M.root) {
+    avatar.traverse(function(c) { if (c.isMesh && c.userData.prim) c.visible = false; });
+    avatar.add(M.root);
+    CHIBI.on = true; CHIBI.mixer = M.mixer; CHIBI.actions = M.actions; CHIBI.hips = M.hips; CHIBI.hipsBind = M.hipsBind;
+    CHIBI.cur = ""; CHIBI.standT = 0; CHIBI.idleT = 0;
+  } else {
+    CHIBI.on = false;
+    loadChibiModel(myGender());
+  }
+}
+function setChibiAnim(name) {
+  if (!CHIBI.actions || !CHIBI.actions[name] || CHIBI.cur === name) return;
+  var prev = CHIBI.cur ? CHIBI.actions[CHIBI.cur] : null;
+  var a = CHIBI.actions[name];
+  a.timeScale = name === "sit" ? 1.8 : (name === "stand" || name === "kneel" || name === "unkneel" ? 1.5 : 1);
+  a.reset(); if (name === "unkneel") a.time = 5.5; a.fadeIn(0.22); a.play();
+  if (prev && prev !== a) prev.fadeOut(0.22);
+  CHIBI.cur = name;
+}
+function updateChibiAnim(dt, moving) {
+  if (!CHIBI.on || !CHIBI.mixer) return;
+  if (CHIBI.standT > 0) {
+    CHIBI.standT -= dt;
+    if (CHIBI.standT <= 0) { SITTING = null; KNEELING = null; avatar.rotation.x = 0; CHIBI.cur = ""; }
+  }
+  if (CHIBI.standAnimT > 0) CHIBI.standAnimT -= dt;
+  if (CHIBI.actT > 0) { CHIBI.actT -= dt; if (moving) CHIBI.actT = 0; }
+  if (!SITTING && !KNEELING && CHIBI.standT <= 0) avatar.position.y *= Math.max(0, 1 - dt * 6);
+  var want;
+  if (CHIBI.debugAnim) want = CHIBI.debugAnim;
+  else if (CHIBI.standT > 0) want = CHIBI.exitClip || "stand";
+  else if (KNEELING) want = (CHIBI.actions && CHIBI.actions.kneel) ? "kneel" : "sit";
+  else if (SITTING) want = "sit";
+  else if (CHIBI.standAnimT > 0 && !moving) want = CHIBI.exitClip || "stand";
+  else if (moving) want = "walk";
+  else if (CHIBI.actT > 0 && CHIBI.actAnim) want = CHIBI.actAnim;
+  else {
+    CHIBI.idleT += dt;
+    if (CHIBI.angryT > 0) { CHIBI.angryT -= dt; want = "idle2"; if (CHIBI.angryT <= 0) CHIBI.idleT = 0; }
+    else {
+      want = "idle";
+      if (CHIBI.idleT > 10 + CHIBI.idleSeed) { CHIBI.angryT = 5; CHIBI.idleSeed = Math.random() * 9; }
+    }
+  }
+  if (want) setChibiAnim(want);
+  if (CHIBI.cur === "walk" && CHIBI.actions["walk"]) {
+    CHIBI.actions["walk"].timeScale = 0.9 + 0.245 * ((settings().speed || 1) - 1);
+  }
+  CHIBI.mixer.update(dt);
+  if (CHIBI.hips) { CHIBI.hips.position.x = CHIBI.hipsBind.x; CHIBI.hips.position.z = CHIBI.hipsBind.z; }
+}
+if (typeof avatar !== "undefined" && avatar) loadChibiModel(myGender());
+
 /* ================= DIEU KHIEN GOC NHIN THU 3 ================= */
 function bindControls() {
   var el = renderer.domElement;
@@ -2426,7 +2551,7 @@ var raycaster = new THREE.Raycaster();
 function sitOn(spot) {
   if (!spot || !avatar) return;
   SITTING = spot;
-  avatar.position.set(spot.x, spot.y, spot.z);
+  avatar.position.set(spot.x, spot.y + (typeof chibiSitDY === "function" ? chibiSitDY(spot) : 0), spot.z);
   avatar.rotation.y = spot.r;
   toast("Ngồi nghỉ ngắm sao ✨ Di chuyển để đứng dậy");
 }
@@ -2472,7 +2597,13 @@ function animate() {
     .addScaledVector(rightDir, str);
   var moving = move.lengthSq() > 0.002;
   if (SITTING || KNEELING) {
-    if (moving) { SITTING = null; KNEELING = null; avatar.position.y = 0; avatar.rotation.x = 0; }
+    if (moving) {
+      if (CHIBI.on && CHIBI.mixer) {
+        if (CHIBI.standT <= 0) { var ec2 = (KNEELING && CHIBI.actions && CHIBI.actions.unkneel) ? "unkneel" : "stand"; CHIBI.exitClip = ec2; CHIBI.standT = ec2 === "unkneel" ? 1.0 : 1.45; setChibiAnim(ec2); }
+        if (CHIBI.standT > 0) move.set(0, 0, 0);
+        else { SITTING = null; KNEELING = null; avatar.position.y = 0; avatar.rotation.x = 0; }
+      } else { SITTING = null; KNEELING = null; avatar.position.y = 0; avatar.rotation.x = 0; }
+    }
     else move.set(0, 0, 0);
   }
   if (moving) {
@@ -2496,12 +2627,13 @@ function animate() {
     while (diff < -Math.PI) diff += Math.PI * 2;
     avatar.rotation.y += diff * Math.min(1, dt * 12);
     walkPhase += dt * 9 * (0.6 + 0.4 * (settings().speed || 1));
-    avatar.position.y = Math.abs(Math.sin(walkPhase)) * 0.05;
+    if (!CHIBI.on) avatar.position.y = Math.abs(Math.sin(walkPhase)) * 0.05;
   } else {
     var restNow = SITTING || KNEELING;
-    if (restNow) avatar.position.y += (restNow.y - avatar.position.y) * 0.4;
+    if (restNow) avatar.position.y += ((restNow.y + chibiSitDY(restNow)) - avatar.position.y) * 0.4;
     else avatar.position.y *= 0.8;
   }
+  updateChibiAnim(dt, moving);
   var dist = 5.4 * camDistMul;
   var camOff = new THREE.Vector3(
     Math.sin(camYaw) * Math.cos(camPitch),
