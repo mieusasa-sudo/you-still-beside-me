@@ -22,7 +22,7 @@
   button.pill { cursor: pointer; font-family: inherit; }
   button.pill.add { background: #dd8438; border-color: #dd8438; color: #fff7e6; font-weight: 700; }
   .feedbar { position: absolute; bottom: 118px; left: 12px; z-index: 5; color: #e6d5b3; font-size: 13px; font-style: italic; text-shadow: 0 1px 6px rgba(0,0,0,.9); pointer-events: none; max-width: 62vw; }
-  #actBtn, #knockBtn, #feedBtn, #speedBtn { position: absolute; z-index: 6; border: none; cursor: pointer; font-family: inherit; font-weight: 700; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.45); }
+  #actBtn, #knockBtn, #feedBtn, #speedBtn, #doorBtn { position: absolute; z-index: 6; border: none; cursor: pointer; font-family: inherit; font-weight: 700; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.45); }
   #actBtn { left: 50%; transform: translateX(-50%); bottom: 64px; background: #f0c979; color: #2b1d12; font-size: 15px; padding: 11px 22px; }
   #knockBtn { left: 50%; transform: translateX(-50%); bottom: 112px; background: #8a5a2b; color: #ffe9bb; font-size: 14px; padding: 10px 18px; }
   #knockBtn.pop { animation: kbPop .25s ease-out; }
@@ -31,6 +31,8 @@
   .fx-chip { background: rgba(43,29,14,.88); color: #ffe9bb; border: 1px solid rgba(240,201,121,.65); padding: 6px 14px; border-radius: 999px; font-size: 14.5px; font-weight: 600; box-shadow: 0 4px 18px rgba(0,0,0,.45); animation: fxUp 1.7s ease-out forwards; white-space: nowrap; }
   @keyframes fxUp { 0% { opacity: 0; transform: translateY(10px) scale(.9); } 14% { opacity: 1; transform: translateY(0) scale(1); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-24px) scale(.98); } }
   #feedBtn { right: 12px; bottom: 170px; background: #2e6f8e; color: #eaf7ff; font-size: 14px; padding: 10px 16px; }
+  #doorBtn { left: 50%; transform: translateX(-50%); bottom: 150px; background: #a8402f; color: #fff2e6; font-size: 15px; padding: 11px 20px; }
+  #fadeScreen { position: fixed; inset: 0; background: #20131c; opacity: 0; pointer-events: none; transition: opacity 0.28s ease; z-index: 9000; }
   #speedBtn { right: 12px; bottom: 118px; background: #6d4c26; color: #ffe9bb; font-size: 14px; padding: 10px 16px; }
   #settingsPanel { position: absolute; inset: 0; background: rgba(20,12,6,.55); display: none; align-items: center; justify-content: center; z-index: 47; }
   .setrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px dashed #d9c39a; font-size: 14.5px; }
@@ -357,6 +359,8 @@
   <button id="actBtn" onclick="onActBtn()" style="display:none"></button>
   <button id="knockBtn" onclick="knockMo()" style="display:none">🔔 Gõ mõ</button>
   <button id="feedBtn" onclick="feedFish()" style="display:none"></button>
+  <button id="doorBtn" onclick="onDoorBtn()" style="display:none"></button>
+  <div id="fadeScreen"></div>
   <button id="speedBtn" onclick="cycleSpeed()">🚶 x1</button>
   <div class="toast" id="toast"></div>
   <div id="fxFloat"></div>
@@ -661,6 +665,7 @@ function buildColliders() {
   [[-2.9, 24.6], [2.9, 24.6], [-2.4, 22.7], [2.4, 22.7], [-2.3, 10.1], [2.3, 10.1]].forEach(function(pt) { circ(pt[0], pt[1], 0.3); });
   circ(4.1, -4.3, 0.45);
   circ(-8.9, 17.8, 0.26);
+  circ(-6.4, 11.6, 0.42); circ(6.4, 11.6, 0.42);
   C.boxes.push({ x: 6.8, z: 13.5, rot: 0, hx: 0.92, hz: 0.38 });
   C.boxes.push({ x: 6.8, z: 17.1, rot: Math.PI, hx: 0.92, hz: 0.38 });
   C.boxes.push({ x: 0, z: -5.62, rot: 0, hx: 3.7, hz: 2.38 });
@@ -800,6 +805,13 @@ function updateContextUI() {
     act.style.display = ""; act.textContent = nearSpot.type === "kneel" ? "🙏 Quỳ lạy" : "🪑 Ngồi";
     kn.style.display = "none";
   } else { act.style.display = "none"; kn.style.display = "none"; }
+  var db = document.getElementById("doorBtn");
+  if (db && avatar) {
+    var dz9 = avatar.position.z;
+    if (dz9 > 9.35 && Math.hypot(avatar.position.x, dz9 - 9.6) < 3.1 && !SITTING && !KNEELING) { db.style.display = ""; db.textContent = "🚪 Vào bên trong"; db.dataset.dir = "in"; }
+    else if (dz9 < 8.65 && dz9 > 5.4 && Math.abs(avatar.position.x) < 2.6 && !SITTING && !KNEELING) { db.style.display = ""; db.textContent = "🚪 Ra ngoài"; db.dataset.dir = "out"; }
+    else db.style.display = "none";
+  }
   if (fb) {
     var pd = avatar ? Math.hypot(avatar.position.x + 6.4, avatar.position.z - 15.2) : 99;
     if (pd < 5.4 && !SITTING && !KNEELING) {
@@ -808,6 +820,19 @@ function updateContextUI() {
       else { fb.textContent = "🐟 Cho cá ăn · +3 xu"; fb.style.opacity = "1"; }
     } else fb.style.display = "none";
   }
+}
+function onDoorBtn() {
+  var db = document.getElementById("doorBtn");
+  var dir = db ? db.dataset.dir : "";
+  var fs = document.getElementById("fadeScreen");
+  if (fs) fs.style.opacity = "1";
+  setTimeout(function() {
+    if (avatar) {
+      if (dir === "in") { avatar.position.set(0, 0, 7.3); avatar.rotation.y = Math.PI; camYaw = 0; }
+      else { avatar.position.set(0, 0, 11.5); avatar.rotation.y = 0; camYaw = Math.PI; }
+    }
+    if (fs) setTimeout(function() { fs.style.opacity = "0"; }, 60);
+  }, 300);
 }
 function onActBtn() {
   if (SITTING || KNEELING) standUp();
@@ -1458,6 +1483,26 @@ function makeBlossomTree(x, z, sc) {
   g.position.set(x, 0, z);
   return g;
 }
+
+function makeHeroBlossom(x, z) {
+  var g = new THREE.Group();
+  var trunkM = new THREE.MeshStandardMaterial({ color: 0x4c3a28, roughness: 1 });
+  var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.26, 2.3, 7), trunkM);
+  trunk.position.y = 1.15; g.add(trunk);
+  var br = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.12, 1.4, 6), trunkM);
+  br.position.set(0.55, 2.6, 0.1); br.rotation.z = -0.6; g.add(br);
+  var br2 = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.1, 1.2, 6), trunkM);
+  br2.position.set(-0.5, 2.55, -0.1); br2.rotation.z = 0.65; g.add(br2);
+  var cols = [0xf2a7c3, 0xf7c3d6, 0xee93b8, 0xf9d3e0];
+  [[0, 3.4, 0, 1.5], [1.15, 3.0, 0.3, 1.05], [-1.15, 3.05, -0.25, 1.1], [0.4, 3.9, -0.4, 0.95], [-0.45, 3.85, 0.45, 0.9], [0, 3.1, 0.75, 0.85]].forEach(function(b, bi) {
+    var blob = new THREE.Mesh(new THREE.SphereGeometry(b[3], 10, 8), new THREE.MeshStandardMaterial({ color: cols[bi % 4], roughness: 1, flatShading: true }));
+    blob.scale.y = 0.68;
+    blob.position.set(b[0], b[1], b[2]);
+    g.add(blob);
+  });
+  g.position.set(x, 0, z);
+  return g;
+}
 function makeBench(x, z, rotY, sitRot) {
   var g = new THREE.Group();
   var wood = new THREE.MeshStandardMaterial({ color: 0x7a5a38, roughness: 1 });
@@ -1623,6 +1668,87 @@ function buildTempleRoof() {
     post.position.set(px, 2.15, 10.35); scene.add(post);
   });
 }
+
+/* ===== THAP CHUA 5 TANG (thay mai cu) ===== */
+function buildPagoda() {
+  var slate = new THREE.MeshStandardMaterial({ color: 0x3c434c, roughness: 0.9 });
+  var slateD = new THREE.MeshStandardMaterial({ color: 0x2b3036, roughness: 1 });
+  var verm = new THREE.MeshStandardMaterial({ color: 0xa8402f, roughness: 0.85 });
+  var vermD = new THREE.MeshStandardMaterial({ color: 0x8a3325, roughness: 0.9 });
+  var whiteM = new THREE.MeshStandardMaterial({ color: 0xf3ead9, roughness: 0.95 });
+  var gold = new THREE.MeshStandardMaterial({ color: 0xc9a24d, roughness: 0.35, metalness: 0.6 });
+  var cz = 1.25;
+  function pyramid(w, d, h, mat) {
+    var m = new THREE.Mesh(new THREE.ConeGeometry(1.4142, h, 4), mat || slate);
+    m.rotation.y = Math.PI / 4;
+    m.scale.set(w, 1, d);
+    return m;
+  }
+  function tier(w, d, wallH, yBase, isTop) {
+    var g = new THREE.Group();
+    var walls = new THREE.Mesh(new THREE.BoxGeometry(w, wallH, d), verm);
+    walls.position.y = wallH / 2; g.add(walls);
+    var band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.14, wallH * 0.34, d + 0.14), whiteM);
+    band.position.y = wallH * 0.52; g.add(band);
+    [-1, 1].forEach(function(sz) {
+      for (var wx = -1; wx <= 1; wx++) {
+        var win = new THREE.Mesh(new THREE.BoxGeometry(w * 0.16, wallH * 0.44, 0.06), slateD);
+        win.position.set(wx * w * 0.27, wallH * 0.52, sz * (d / 2 + 0.1));
+        g.add(win);
+      }
+    });
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function(c) {
+      var post = new THREE.Mesh(new THREE.BoxGeometry(0.16, wallH, 0.16), vermD);
+      post.position.set(c[0] * (w / 2 - 0.05), wallH / 2, c[1] * (d / 2 - 0.05));
+      g.add(post);
+    });
+    var lip = new THREE.Mesh(new THREE.BoxGeometry(w + 2.3, 0.16, d + 2.3), slateD);
+    lip.position.y = wallH + 0.1; g.add(lip);
+    var roof = new THREE.Mesh(new THREE.BoxGeometry(w + 1.9, 0.2, d + 1.9), slate);
+    roof.position.y = wallH + 0.28; g.add(roof);
+    var pyr = pyramid(w * 0.36, d * 0.36, wallH * 0.78);
+    pyr.position.y = wallH + 0.38 + wallH * 0.39; g.add(pyr);
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function(c) {
+      var tip = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.6, 4), slateD);
+      tip.position.set(c[0] * (w / 2 + 0.9), wallH + 0.55, c[1] * (d / 2 + 0.9));
+      tip.rotation.z = -c[0] * 0.55;
+      tip.rotation.x = c[1] * 0.55;
+      g.add(tip);
+    });
+    g.position.set(0, yBase, cz);
+    scene.add(g);
+    return yBase + wallH + 0.38 + wallH * 0.78;
+  }
+  var lip0 = new THREE.Mesh(new THREE.BoxGeometry(26.4, 0.2, 19.4), slateD);
+  lip0.position.set(0, 9.82, cz); scene.add(lip0);
+  var eave0 = new THREE.Mesh(new THREE.BoxGeometry(25.6, 0.22, 18.6), slate);
+  eave0.position.set(0, 10.05, cz); scene.add(eave0);
+  var top = 10.16;
+  top = tier(13, 10, 1.9, top);
+  top = tier(10.2, 7.9, 1.7, top + 0.1);
+  top = tier(7.8, 6.1, 1.55, top + 0.1);
+  top = tier(5.6, 4.5, 1.4, top + 0.1);
+  var base = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 0.35, 8), gold);
+  base.position.set(0, top + 0.15, cz); scene.add(base);
+  for (var ri = 0; ri < 5; ri++) {
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(0.3 - ri * 0.028, 0.045, 6, 14), gold);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(0, top + 0.5 + ri * 0.27, cz);
+    scene.add(ring);
+  }
+  var orb = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 10), gold);
+  orb.position.set(0, top + 1.95, cz); scene.add(orb);
+  var spike = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.8, 8), gold);
+  spike.position.set(0, top + 2.4, cz); scene.add(spike);
+  var canLip = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.16, 3.1), slate);
+  canLip.position.set(0, 4.35, 9.75); scene.add(canLip);
+  var canopy = pyramid(2.7, 1.5, 0.95);
+  canopy.position.set(0, 4.9, 9.75); scene.add(canopy);
+  [-1.6, 1.6].forEach(function(px) {
+    var post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 4.3, 0.14), slateD);
+    post.position.set(px, 2.15, 10.35); scene.add(post);
+  });
+}
 function buildYard() {
   var panelMat = new THREE.MeshStandardMaterial({ map: panelTexture(), roughness: 0.9 });
   var woodMat = new THREE.MeshStandardMaterial({ map: woodDarkTexture(), roughness: 0.75 });
@@ -1649,12 +1775,12 @@ function buildYard() {
     var knob = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), new THREE.MeshStandardMaterial({ color: 0xc9a24d, roughness: 0.35, metalness: 0.6 }));
     knob.position.set(-side * 1.28, 1.75, 0.1);
     hinge.add(knob);
-    hinge.rotation.y = side * 2.55;
+    hinge.rotation.y = side * 0.05;
     return hinge;
   }
   scene.add(doorPanel(-1));
   scene.add(doorPanel(1));
-  buildTempleRoof();
+  buildPagoda();
   /* nen san: loi da giua + co hai ben */
   var pathTex = stoneTexture();
   pathTex.wrapS = pathTex.wrapT = THREE.RepeatWrapping; pathTex.repeat.set(1, 6);
@@ -1715,6 +1841,8 @@ function buildYard() {
   scene.add(makeBlossomTree(-10.5, 11.2, 1.0));
   scene.add(makeBlossomTree(-4.9, 24.9, 1.1));
   scene.add(makeBlossomTree(5.3, 25.6, 1.2));
+  scene.add(makeHeroBlossom(-6.4, 11.6));
+  scene.add(makeHeroBlossom(6.4, 11.6));
   scene.add(makeBamboo(-4.6, 20.6, 1.15));
   scene.add(makeBamboo(4.6, 20.6, 1.0));
   scene.add(makeStoneLantern(-2.4, 22.7));
@@ -2772,8 +2900,7 @@ function animate() {
     move.normalize().multiplyScalar(3.4 * (settings().speed || 1) * Math.min(dt, 0.033) * (Math.abs(fwd) + Math.abs(str) > 1.4 ? 0.75 : 1));
     var pz = avatar.position.z;
     avatar.position.add(move);
-    var inLane = Math.abs(avatar.position.x) < 1.35;
-    if (!inLane && avatar.position.z > 8.65 && avatar.position.z < 9.35) {
+    if (avatar.position.z > 8.65 && avatar.position.z < 9.35) {
       avatar.position.z = pz < 9 ? 8.65 : 9.35;
     }
     var inGate = Math.abs(avatar.position.x) < 1.55;
