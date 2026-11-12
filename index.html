@@ -645,10 +645,63 @@ function plopSfx() {
   o.connect(g); g.connect(sfxBus); o.start(t0); o.stop(t0 + 0.18);
 }
 
+/* ===== DIEM DUNG DAY + VA CHAM VAT THE ===== */
+function seatExitPos(spot) {
+  var fx = Math.sin(spot.r), fz = Math.cos(spot.r);
+  var d = spot.type === "kneel" ? -0.6 : 0.72;
+  return { x: spot.x + fx * d, z: spot.z + fz * d };
+}
+var COLLIDERS = { circles: [], boxes: [], ellipses: [], built: false };
+function buildColliders() {
+  var C = COLLIDERS;
+  function circ(x, z, r) { C.circles.push({ x: x, z: z, r: r }); }
+  circ(6.8, 15.3, 0.78);
+  circ(5.35, 15.3, 0.37); circ(8.25, 15.3, 0.37);
+  [[-9.7, 18.6], [-7.8, 19.5], [8.2, 20], [9.7, 12.3], [-10.5, 11.2], [-4.9, 24.9], [5.3, 25.6]].forEach(function(pt) { circ(pt[0], pt[1], 0.34); });
+  [[-2.9, 24.6], [2.9, 24.6], [-2.4, 22.7], [2.4, 22.7], [-2.3, 10.1], [2.3, 10.1]].forEach(function(pt) { circ(pt[0], pt[1], 0.3); });
+  circ(4.1, -4.3, 0.45);
+  circ(-8.9, 17.8, 0.26);
+  C.boxes.push({ x: 6.8, z: 13.5, rot: 0, hx: 0.92, hz: 0.38 });
+  C.boxes.push({ x: 6.8, z: 17.1, rot: Math.PI, hx: 0.92, hz: 0.38 });
+  C.boxes.push({ x: 0, z: -5.62, rot: 0, hx: 3.7, hz: 2.38 });
+  C.ellipses.push({ x: -6.4, z: 15.2, rx: 2.35, rz: 1.95 });
+  C.built = true;
+}
+function resolveCollisions() {
+  if (!avatar) return;
+  if (!COLLIDERS.built) buildColliders();
+  var R = 0.3, p = avatar.position, i, c, dx, dz, rr, d2;
+  for (i = 0; i < COLLIDERS.circles.length; i++) {
+    c = COLLIDERS.circles[i];
+    dx = p.x - c.x; dz = p.z - c.z; rr = c.r + R; d2 = dx * dx + dz * dz;
+    if (d2 < rr * rr) { if (d2 < 0.000001) { p.x = c.x + rr; p.z = c.z; } else { var d = Math.sqrt(d2); p.x = c.x + dx / d * rr; p.z = c.z + dz / d * rr; } }
+  }
+  for (i = 0; i < COLLIDERS.boxes.length; i++) {
+    var b = COLLIDERS.boxes[i];
+    var cosr = Math.cos(b.rot), sinr = Math.sin(b.rot);
+    dx = p.x - b.x; dz = p.z - b.z;
+    var lx = cosr * dx - sinr * dz;
+    var lz = sinr * dx + cosr * dz;
+    var ex = b.hx + R, ez = b.hz + R;
+    if (Math.abs(lx) < ex && Math.abs(lz) < ez) {
+      var px2 = ex - Math.abs(lx), pz2 = ez - Math.abs(lz);
+      if (px2 < pz2) lx = lx < 0 ? -ex : ex; else lz = lz < 0 ? -ez : ez;
+      p.x = b.x + cosr * lx + sinr * lz;
+      p.z = b.z - sinr * lx + cosr * lz;
+    }
+  }
+  for (i = 0; i < COLLIDERS.ellipses.length; i++) {
+    var e = COLLIDERS.ellipses[i];
+    var ux = (p.x - e.x) / (e.rx + R), uz = (p.z - e.z) / (e.rz + R);
+    var q = ux * ux + uz * uz;
+    if (q < 1 && q > 0.000001) { var sq = Math.sqrt(q); p.x = e.x + ux / sq * (e.rx + R); p.z = e.z + uz / sq * (e.rz + R); }
+  }
+}
 function standUp() {
-  if (typeof CHIBI !== "undefined" && CHIBI.on && (SITTING || KNEELING)) { var ec = (KNEELING && CHIBI.actions && CHIBI.actions.unkneel) ? "unkneel" : "stand"; CHIBI.exitClip = ec; CHIBI.standAnimT = ec === "unkneel" ? 1.0 : 1.4; if (typeof setChibiAnim === "function") setChibiAnim(ec); }
+  var spot = SITTING || KNEELING;
+  if (typeof CHIBI !== "undefined" && CHIBI.on && spot) { var ec = (KNEELING && CHIBI.actions && CHIBI.actions.unkneel) ? "unkneel" : "stand"; CHIBI.exitClip = ec; CHIBI.standAnimT = ec === "unkneel" ? 1.0 : 1.4; if (typeof setChibiAnim === "function") setChibiAnim(ec); }
   SITTING = null; KNEELING = null;
-  if (avatar) { avatar.position.y = 0; avatar.rotation.x = 0; }
+  if (avatar) { avatar.position.y = 0; avatar.rotation.x = 0; if (spot) { var ep = seatExitPos(spot); avatar.position.x = ep.x; avatar.position.z = ep.z; } }
 }
 function kneelOn(spot) {
   if (!spot || !avatar) return;
@@ -2572,7 +2625,7 @@ function updateChibiAnim(dt, moving) {
   if (!CHIBI.on || !CHIBI.mixer) return;
   if (CHIBI.standT > 0) {
     CHIBI.standT -= dt;
-    if (CHIBI.standT <= 0) { SITTING = null; KNEELING = null; avatar.rotation.x = 0; CHIBI.cur = ""; }
+    if (CHIBI.standT <= 0) { var doneSpot = SITTING || KNEELING; SITTING = null; KNEELING = null; avatar.rotation.x = 0; CHIBI.cur = ""; if (doneSpot) { var ep2 = seatExitPos(doneSpot); avatar.position.x = ep2.x; avatar.position.z = ep2.z; } }
   }
   if (CHIBI.standAnimT > 0) CHIBI.standAnimT -= dt;
   if (CHIBI.actT > 0) { CHIBI.actT -= dt; if (moving) CHIBI.actT = 0; }
@@ -2730,6 +2783,7 @@ function animate() {
     avatar.position.x = Math.max(avatar.position.z > 9 ? -9.8 : -9.9, Math.min(avatar.position.z > 9 ? 9.8 : 9.9, avatar.position.x));
     if (avatar.position.z >= 21.95) avatar.position.x = Math.max(-1.5, Math.min(1.5, avatar.position.x));
     avatar.position.z = Math.max(-2.9, Math.min(26.4, avatar.position.z));
+    resolveCollisions();
     var targetRot = Math.atan2(move.x, move.z);
     var diff = targetRot - avatar.rotation.y;
     while (diff > Math.PI) diff -= Math.PI * 2;
