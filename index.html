@@ -2314,8 +2314,8 @@ function refreshCell(i) {
 }
 /* ================= AVATAR ================= */
 var SHIRT_COLORS = [0x9fc6a5, 0x7d94b8, 0xc98a9a, 0xe0b45c, 0x9a86c8, 0x6fb3a6, 0xd98c5f, 0xb8c86b, 0xe58ea0, 0x7fb069];
-var HAIR_COLORS = [0x4a3220, 0x2f2a26, 0x8a5a30, 0x5d4037, 0xb08968, 0x704214, 0x3b2f2f];
-var SKIN_COLORS = [0xf2c79b, 0xeebd8d, 0xf6cf9f, 0xe0ac82, 0xc98d64];
+var HAIR_COLORS = [0x2f2a26, 0x4a3220, 0x8a5a30, 0xb08968, 0xe8c47a, 0xd96c47, 0xc94f5e, 0xe58ea0, 0x9a86c8, 0x7d94b8, 0x6fb3a6, 0xe8e8e8];
+var SKIN_COLORS = [0xf6c9b0, 0xd99e73, 0x96684a];
 function pickC(a) { return a[Math.floor(Math.random() * a.length)]; }
 var pfDraft = null;
 function myName() {
@@ -2377,13 +2377,14 @@ function buildAvatar() {
 var CHIBI_SCALE = 1.5;
 var CHIBI = { on: false, mixer: null, actions: null, hips: null, hipsBind: { x: 0, z: 0 }, cur: "", standT: 0, standAnimT: 0, idleT: 0, idleSeed: 6, angryT: 0, debugAnim: "", actT: 0, actAnim: "" };
 var CHIBI_MODELS = {
-  nam: { chunks: ["boy-model-1.js", "boy-model-2.js", "boy-model-3.js", "boy-model-4.js", "boy-model-5.js", "boy-model-6.js", "boy-model-7.js", "boy-model-8.js", "boy-model-9.js", "boy-model-10.js"], prefix: "__BOY_B64_", clips: { idle: "Holding_Idle", idle2: "Angry", walk: "Standard_Walk", sit: "Sitting", stand: "Sit_To_Stand", act: "Rummaging", kneel: "Stand_To_Kneel", unkneel: "Kneel_To_Stand" }, root: null, mixer: null, actions: null, hips: null, hipsBind: { x: 0, z: 0 }, loading: false },
-  nu: { chunks: ["girl-model-1.js", "girl-model-2.js", "girl-model-3.js", "girl-model-4.js", "girl-model-5.js", "girl-model-6.js", "girl-model-7.js", "girl-model-8.js", "girl-model-9.js", "girl-model-10.js", "girl-model-11.js", "girl-model-12.js", "girl-model-13.js", "girl-model-14.js", "girl-model-15.js"], prefix: "__GIRL_B64_", clips: { idle: "Sad_Idle", idle2: "Angry", walk: "Walking", sit: "Stand_To_Sit", stand: "Sit_To_Stand", act: "Rummaging", kneel: "Stand_To_Kneel", unkneel: "Kneel_To_Stand" }, root: null, mixer: null, actions: null, hips: null, hipsBind: { x: 0, z: 0 }, loading: false }
+  nam: { shirtWhite: true, sitDY: -0.075, kneelDY: 0.11, chunks: ["boy-model-1.js", "boy-model-2.js", "boy-model-3.js", "boy-model-4.js", "boy-model-5.js", "boy-model-6.js", "boy-model-7.js", "boy-model-8.js", "boy-model-9.js", "boy-model-10.js"], prefix: "__BOY_B64_", clips: { idle: "Holding_Idle", idle2: "Angry", walk: "Standard_Walk", sit: "Sitting", stand: "Sit_To_Stand", act: "Rummaging", kneel: "Stand_To_Kneel", unkneel: "Kneel_To_Stand" }, root: null, mixer: null, actions: null, hips: null, hipsBind: { x: 0, z: 0 }, loading: false },
+  nu: { shirtWhite: false, sitDY: -0.033, kneelDY: 0.11, chunks: ["girl-model-1.js", "girl-model-2.js", "girl-model-3.js", "girl-model-4.js", "girl-model-5.js", "girl-model-6.js", "girl-model-7.js", "girl-model-8.js", "girl-model-9.js", "girl-model-10.js", "girl-model-11.js", "girl-model-12.js", "girl-model-13.js", "girl-model-14.js", "girl-model-15.js"], prefix: "__GIRL_B64_", clips: { idle: "Sad_Idle", idle2: "Angry", walk: "Walking", sit: "Stand_To_Sit", stand: "Sit_To_Stand", act: "Rummaging", kneel: "Stand_To_Kneel", unkneel: "Kneel_To_Stand" }, root: null, mixer: null, actions: null, hips: null, hipsBind: { x: 0, z: 0 }, loading: false }
 };
 function chibiSitDY(spot) {
   if (!CHIBI.on || !spot) return 0;
-  if (spot.type === "kneel") return (CHIBI.actions && CHIBI.actions.kneel) ? 0.05 : -0.19;
-  return -0.26;
+  var M = CHIBI_MODELS[myGender()];
+  if (spot.type === "kneel") return (CHIBI.actions && CHIBI.actions.kneel) ? (M && M.kneelDY != null ? M.kneelDY : 0.11) : -0.05;
+  return M && M.sitDY != null ? M.sitDY : -0.1;
 }
 function loadChibiModel(g) {
   var M = CHIBI_MODELS[g];
@@ -2424,6 +2425,7 @@ function decodeChibi(g) {
       });
       var hips = null;
       root.traverse(function(c) { if (c.isBone && c.name.indexOf("Hips") >= 0) hips = c; });
+      root.traverse(function(c) { if (c.isMesh && c.material && c.material.map && !M.baseTex) { M.baseTex = c.material.map; M.baseImg = c.material.map.image; } });
       M.root = root; M.mixer = mixer; M.actions = actions; M.hips = hips;
       M.hipsBind = hips ? { x: hips.position.x, z: hips.position.z } : { x: 0, z: 0 };
       M.loading = false;
@@ -2446,6 +2448,7 @@ function attachChibi() {
     avatar.add(M.root);
     CHIBI.on = true; CHIBI.mixer = M.mixer; CHIBI.actions = M.actions; CHIBI.hips = M.hips; CHIBI.hipsBind = M.hipsBind;
     CHIBI.cur = ""; CHIBI.standT = 0; CHIBI.idleT = 0;
+    if (typeof applyChibiColors === "function") applyChibiColors();
   } else {
     CHIBI.on = false;
     loadChibiModel(myGender());
@@ -2459,6 +2462,75 @@ function setChibiAnim(name) {
   a.reset(); if (name === "unkneel") a.time = 5.5; a.fadeIn(0.22); a.play();
   if (prev && prev !== a) prev.fadeOut(0.22);
   CHIBI.cur = name;
+}
+/* ===== TO LAI MAU NHAN VAT CHIBI THEO CREATOR (da / toc / ao) ===== */
+var CHIBI_TEX = { key: "", tex: null };
+function hsl2rgb(h, s, l) {
+  h = ((h % 360) + 360) % 360 / 360;
+  var r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    var p2 = 2 * l - q;
+    function hue2rgb(p3, q3, t) {
+      if (t < 0) t += 1; if (t > 1) t -= 1;
+      if (t < 1 / 6) return p3 + (q3 - p3) * 6 * t;
+      if (t < 1 / 2) return q3;
+      if (t < 2 / 3) return p3 + (q3 - p3) * (2 / 3 - t) * 6;
+      return p3;
+    }
+    r = hue2rgb(p2, q, h + 1 / 3); g = hue2rgb(p2, q, h); b = hue2rgb(p2, q, h - 1 / 3);
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+function applyChibiColors() {
+  if (!CHIBI.on) return;
+  var M = CHIBI_MODELS[myGender()];
+  if (!M || !M.root) return;
+  if (!M || !M.baseImg) return;
+  var C = myColors();
+  var key = myGender() + "|" + C.skin + "|" + C.hair + "|" + C.shirt;
+  if (CHIBI_TEX.key === key) return;
+  CHIBI_TEX.key = key;
+  try {
+    var SZ = 1024;
+    var cv = document.createElement("canvas"); cv.width = SZ; cv.height = SZ;
+    var cx2 = cv.getContext("2d");
+    cx2.drawImage(M.baseImg, 0, 0, SZ, SZ);
+    var id = cx2.getImageData(0, 0, SZ, SZ), d = id.data;
+    var skf = [ (C.skin >> 16 & 255) / 246, (C.skin >> 8 & 255) / 201, (C.skin & 255) / 176 ];
+    var hCol = new THREE.Color(C.hair), hHSL = {}; hCol.getHSL(hHSL);
+    var sCol = new THREE.Color(C.shirt), sHSL = {}; sCol.getHSL(sHSL);
+    var hairH = hHSL.h * 360, hairS = Math.max(hHSL.s, 0.12), hairL = Math.max(hHSL.l, 0.04);
+    var shirtH = sHSL.h * 360, shirtS = Math.max(sHSL.s, 0.15);
+    for (var i = 0; i < d.length; i += 4) {
+      var r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+      var mx = Math.max(r, g, b), mn = Math.min(r, g, b), L = (mx + mn) / 2;
+      var df = mx - mn;
+      var S = df === 0 ? 0 : (L > 0.5 ? df / (2 - mx - mn) : df / (mx + mn));
+      var Hh = 0;
+      if (df !== 0) {
+        if (mx === r) Hh = ((g - b) / df) % 6; else if (mx === g) Hh = (b - r) / df + 2; else Hh = (r - g) / df + 4;
+        Hh *= 60; if (Hh < 0) Hh += 360;
+      }
+      if (Hh >= 5 && Hh <= 38 && S >= 0.12 && S <= 0.78 && L >= 0.55 && L <= 0.93 && (r - b) > 0.08) {
+        d[i] = Math.min(255, d[i] * skf[0]); d[i + 1] = Math.min(255, d[i + 1] * skf[1]); d[i + 2] = Math.min(255, d[i + 2] * skf[2]);
+      } else if (L < 0.17 && S < 0.55 && L >= 0.065) {
+        var rgb2 = hsl2rgb(hairH, hairS, Math.min(0.85, L * (hairL / 0.13)));
+        d[i] = rgb2[0]; d[i + 1] = rgb2[1]; d[i + 2] = rgb2[2];
+      } else if ((Hh >= 95 && Hh <= 165 && S > 0.25 && L < 0.75) || (M.shirtWhite && L > 0.9 && S < 0.16)) {
+        var rgb3 = hsl2rgb(shirtH, shirtS, L);
+        d[i] = rgb3[0]; d[i + 1] = rgb3[1]; d[i + 2] = rgb3[2];
+      }
+    }
+    cx2.putImageData(id, 0, 0);
+    var tex = new THREE.CanvasTexture(cv);
+    tex.flipY = false;
+    if (M.baseTex) { tex.encoding = M.baseTex.encoding; tex.wrapS = M.baseTex.wrapS; tex.wrapT = M.baseTex.wrapT; }
+    M.root.traverse(function(o) { if (o.isMesh && o.material && o.material.map) o.material.map = tex; });
+    if (CHIBI_TEX.tex) CHIBI_TEX.tex.dispose();
+    CHIBI_TEX.tex = tex;
+  } catch (e) { /* loi to mau thi giu texture goc */ }
 }
 function updateChibiAnim(dt, moving) {
   if (!CHIBI.on || !CHIBI.mixer) return;
