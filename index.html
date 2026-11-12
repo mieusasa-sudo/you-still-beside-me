@@ -217,7 +217,7 @@
     <div class="modal">
       <button class="modal-x" onclick="closeAdd3D()">✕</button>
       <h3>Cho bé của bạn một chỗ</h3>
-      <p class="modal-sub">Chỗ này sẽ ở lại trên vách miếu để mọi người ghé thăm.<br>Ô <b id="addPosLabel">A-00</b> · Dãy A</p>
+      <p class="modal-sub">Chỗ này sẽ ở lại trên vách miếu để mọi người ghé thăm.<br>Ô <b id="addPosLabel">A-00</b> · <span id="addZoneLabel">Dãy A</span></p>
       <div class="photo-pick" id="photoPick" onclick="document.getElementById('photoInput').click()">
         <span class="big">📷</span><span>Thêm ảnh</span>
       </div>
@@ -389,7 +389,7 @@ function loadState() {
 function saveState() { try { localStorage.setItem(STORE_KEY, JSON.stringify(U)); } catch (e) {} }
 function esc(t) { return String(t == null ? "" : t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function todayStr() { var d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
-function posLabel(i) { var n = i >= 32 ? i - 31 : i + 1; return (i >= 32 ? "B-" : "A-") + (n < 10 ? "0" : "") + n; }
+function posLabel(i) { if (i >= 64) { var np = i - 63; return "P-" + (np < 10 ? "0" : "") + np; } var n = i >= 32 ? i - 31 : i + 1; return (i >= 32 ? "B-" : "A-") + (n < 10 ? "0" : "") + n; }
 function toast(msg) {
   var t = document.getElementById("toast");
   t.textContent = msg;
@@ -536,7 +536,7 @@ function tagTexture(text) {
 
 <script>
 /* ================= KHOI TAO 3D ================= */
-var COLS = 8, ROWS = 4, NCELLS = 64;
+var COLS = 8, ROWS = 4, NCELLS = 96;
 var scene, camera, renderer, clock;
 var cells = [];        // {group, hit, photoMesh, plaqueMesh, glow, candleG, incenseG, flowerS, giftM, flame}
 var hitMeshes = [];
@@ -572,6 +572,8 @@ function init3D() {
 
   buildRoom();
   buildWall();
+  buildPetWall();
+  buildPetZone();
   buildBuddha();
   buildDecor();
   buildYard();
@@ -669,6 +671,10 @@ function buildColliders() {
   C.boxes.push({ x: 6.8, z: 13.5, rot: 0, hx: 0.92, hz: 0.38 });
   C.boxes.push({ x: 6.8, z: 17.1, rot: Math.PI, hx: 0.92, hz: 0.38 });
   C.boxes.push({ x: 0, z: -5.62, rot: 0, hx: 3.7, hz: 2.38 });
+  C.boxes.push({ x: 3.5, z: 11.75, rot: 0, hx: 0.35, hz: 2.15 });
+  C.boxes.push({ x: 3.5, z: 18.95, rot: 0, hx: 0.35, hz: 2.65 });
+  C.boxes.push({ x: 19.45, z: 15.5, rot: 0, hx: 0.35, hz: 5.8 });
+  circ(11.5, 20.6, 0.34); circ(18.3, 11.3, 0.34);
   C.ellipses.push({ x: -6.4, z: 15.2, rx: 2.35, rz: 1.95 });
   C.built = true;
 }
@@ -1792,7 +1798,7 @@ function buildYard() {
   var gL = new THREE.Mesh(new THREE.PlaneGeometry(8.4, 12.6), grassMat);
   gL.rotation.x = -Math.PI / 2; gL.position.set(-7.25, 0.005, 15.3); scene.add(gL);
   var gR = gL.clone(); gR.position.x = 7.25; scene.add(gR);
-  var baseGround = new THREE.Mesh(new THREE.PlaneGeometry(23.4, 38), grassMat);
+  var baseGround = new THREE.Mesh(new THREE.PlaneGeometry(46, 38), grassMat);
   baseGround.rotation.x = -Math.PI / 2; baseGround.position.set(0, -0.02, 12.2); scene.add(baseGround);
   /* troi hoang hon + trang */
   var sky = new THREE.Mesh(new THREE.PlaneGeometry(90, 30), new THREE.MeshBasicMaterial({ map: skyTexture(), fog: false }));
@@ -1801,7 +1807,7 @@ function buildYard() {
   moon.scale.set(4.5, 4.5, 1); moon.position.set(-9, 10.5, 29); scene.add(moon);
   /* hang rao cuoi san + hang cay xanh hai ben */
   var fenceMat = new THREE.MeshStandardMaterial({ color: 0x4a3826, roughness: 1 });
-  for (var fx = -11; fx <= 11; fx += 2.2) {
+  for (var fx = -20.9; fx <= 20.9; fx += 2.2) {
     if (Math.abs(fx) < 1.8) continue;
     var post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.25, 0.16), fenceMat);
     post.position.set(fx, 0.62, 21.6); scene.add(post);
@@ -1810,7 +1816,7 @@ function buildYard() {
     var gp = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.4, 0.22), fenceMat);
     gp.position.set(gx, 0.7, 21.6); scene.add(gp);
   });
-  [-6.5, 6.5].forEach(function(rx) {
+  [-6.5, 6.5, -16.2, 16.2].forEach(function(rx) {
     var rail1 = new THREE.Mesh(new THREE.BoxGeometry(9.8, 0.12, 0.08), fenceMat);
     rail1.position.set(rx, 0.95, 21.6); scene.add(rail1);
     var rail2 = rail1.clone(); rail2.position.y = 0.45; scene.add(rail2);
@@ -1831,8 +1837,8 @@ function buildYard() {
   scene.add(makeStoneLantern(2.9, 24.6));
   var hedgeMat = new THREE.MeshStandardMaterial({ color: 0x2c4423, roughness: 1 });
   var hL = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.0, 12.6), hedgeMat);
-  hL.position.set(-11.2, 0.5, 15.3); scene.add(hL);
-  var hR = hL.clone(); hR.position.x = 11.2; scene.add(hR);
+  hL.position.set(-19.9, 0.5, 15.3); scene.add(hL);
+  var hR = hL.clone(); hR.position.x = 19.9; scene.add(hR);
   /* cay + truc + den da doc loi */
   scene.add(makeBlossomTree(-9.7, 18.6, 1.15));
   scene.add(makeBlossomTree(-7.8, 19.5, 1.4));
@@ -2344,6 +2350,10 @@ function buildBuddha() {
 /* ================= VACH O THO ================= */
 var CELL_W = 2.06, CELL_H = 1.96, WALL_Z = -6.35;
 function cellCenter(i) {
+  if (i >= 64) {
+    var pj = i - 64, pcol = pj % 8, prow = Math.floor(pj / 8);
+    return { x: 19.2, y: 2.45 + (1.5 - prow) * 1.215, z: 15.5 + (pcol - 3.5) * 1.277, ry: -Math.PI / 2 };
+  }
   var south = i >= 32;
   var j = south ? i - 32 : i;
   var bank = j < 16 ? 0 : 1;
@@ -2392,6 +2402,7 @@ function buildWall() {
     var grp = new THREE.Group();
     grp.position.set(c.x, c.y, c.z);
     if (c.ry) grp.rotation.y = c.ry;
+    if (i >= 64) grp.scale.setScalar(0.62);
     scene.add(grp);
 
     var cavity = new THREE.Mesh(
@@ -2472,6 +2483,74 @@ function buildWall() {
     cells.push({ grp: grp, photo: photo, plaque: plaque, glow: glow, candleG: candleG, incenseG: incenseG, flowerS: flowerS, giftG: giftG, giftToyShown: null });
   }
 }
+
+/* ===== KHU THU CUNG (phia dong san rong): vach di anh pet + rao chia khu + cau vong ===== */
+function petSignTexture() {
+  return makeTex(512, 128, function(x, W, H) {
+    x.fillStyle = "#a8402f"; x.fillRect(0, 0, W, H);
+    x.strokeStyle = "#f3ead9"; x.lineWidth = 6; x.strokeRect(10, 10, W - 20, H - 20);
+    x.fillStyle = "#fdf6e3"; x.font = "bold 58px Georgia, serif"; x.textAlign = "center"; x.textBaseline = "middle";
+    x.fillText("KHU THU CUNG", W / 2, H / 2 + 2);
+  });
+}
+function buildPetWall() {
+  var woodMat = new THREE.MeshStandardMaterial({ map: woodDarkTexture(), roughness: 0.75 });
+  var slate = new THREE.MeshStandardMaterial({ color: 0x3c434c, roughness: 0.9 });
+  var cab = new THREE.Mesh(new THREE.BoxGeometry(0.55, 5.3, 11.6), woodMat);
+  cab.position.set(19.52, 2.65, 15.5); scene.add(cab);
+  var topBar = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 12.0), woodMat);
+  topBar.position.set(19.52, 5.45, 15.5); scene.add(topBar);
+  var botBar = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.35, 12.0), woodMat);
+  botBar.position.set(19.52, 0.17, 15.5); scene.add(botBar);
+  var roof = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.16, 12.4), slate);
+  roof.position.set(19.4, 5.75, 15.5); scene.add(roof);
+}
+function buildPetZone() {
+  var hedgeMat = new THREE.MeshStandardMaterial({ color: 0x2c4423, roughness: 1 });
+  var woodMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.9 });
+  var verm = new THREE.MeshStandardMaterial({ color: 0xa8402f, roughness: 0.85 });
+  [[11.75, 4.3], [18.95, 5.3]].forEach(function(hd) {
+    var h = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.9, hd[1]), hedgeMat);
+    h.position.set(3.5, 0.45, hd[0]); scene.add(h);
+  });
+  [13.95, 16.35].forEach(function(pz) {
+    var post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.6, 0.18), woodMat);
+    post.position.set(3.5, 1.3, pz); scene.add(post);
+  });
+  var board = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.66, 2.9), verm);
+  board.position.set(3.5, 2.72, 15.15); scene.add(board);
+  var signTex = petSignTexture();
+  [-1, 1].forEach(function(sd) {
+    var sp = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.55), new THREE.MeshBasicMaterial({ map: signTex }));
+    sp.position.set(3.5 + sd * 0.06, 2.72, 15.15); sp.rotation.y = sd > 0 ? Math.PI / 2 : -Math.PI / 2;
+    scene.add(sp);
+  });
+  var rb = new THREE.Group(); rb.position.set(14.8, 0, 20.4); rb.rotation.y = -0.5;
+  var rbCols = [0xe5534b, 0xf28c4b, 0xf7d154, 0x7fb069, 0x5b8dd9];
+  rbCols.forEach(function(cc, ri) {
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(1.9 - ri * 0.14, 0.085, 8, 24, Math.PI), new THREE.MeshStandardMaterial({ color: cc, roughness: 0.6 }));
+    ring.position.y = 0.12; rb.add(ring);
+  });
+  var cloudMat = new THREE.MeshStandardMaterial({ color: 0xfdfdf8, roughness: 1 });
+  [-1.9, 1.9].forEach(function(cx) {
+    var cl = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), cloudMat);
+    cl.scale.set(1.25, 0.55, 0.9); cl.position.set(cx, 0.16, 0); rb.add(cl);
+  });
+  scene.add(rb);
+  var bedCols = [0xf27d9d, 0xf7d154, 0xffffff, 0xb48ce0, 0xf28c4b];
+  [[10, 12.3], [12.8, 18.6], [7.6, 20.2]].forEach(function(bp, bi) {
+    var soil = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.05, 0.14, 14), new THREE.MeshStandardMaterial({ color: 0x4a3521, roughness: 1 }));
+    soil.position.set(bp[0], 0.07, bp[1]); scene.add(soil);
+    for (var fi = 0; fi < 13; fi++) {
+      var fa = (fi / 13) * Math.PI * 2 + bi, fr = 0.25 + (fi % 3) * 0.28;
+      var fl = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 6), new THREE.MeshStandardMaterial({ color: bedCols[(fi + bi) % bedCols.length], roughness: 0.7 }));
+      fl.position.set(bp[0] + Math.cos(fa) * fr, 0.2, bp[1] + Math.sin(fa) * fr); scene.add(fl);
+    }
+  });
+  scene.add(makeBlossomTree(11.5, 20.6, 1.2));
+  scene.add(makeBlossomTree(18.3, 11.3, 1.05));
+}
+
 function refreshCell(i) {
   var sh = U.shrines[i];
   var C = cells[i];
@@ -2864,10 +2943,15 @@ function tapAt(e) {
     if (idx === undefined || !cells[idx]) return;
     var cg = cells[idx].grp.position;
     var cdx = avatar.position.x - cg.x, cdz = avatar.position.z - cg.z;
-    var lim = idx >= 32 ? 10.2 : 18.5;
-    if (cdx * cdx + cdz * cdz > lim) return;
-    if (idx >= 32 && avatar.position.z > 8.6) return;
-    if (idx < 32 && avatar.position.z < -6.2) return;
+    if (idx >= 64) {
+      if (cdx * cdx + cdz * cdz > 12) return;
+      if (avatar.position.x < 15) return;
+    } else {
+      var lim = idx >= 32 ? 10.2 : 18.5;
+      if (cdx * cdx + cdz * cdz > lim) return;
+      if (idx >= 32 && avatar.position.z > 8.6) return;
+      if (idx < 32 && avatar.position.z < -6.2) return;
+    }
     if (U.shrines[idx]) openDetail3D(idx); else openAdd3D(idx);
   }
 }
@@ -2907,7 +2991,7 @@ function animate() {
     if (!inGate && avatar.position.z > 21.25 && avatar.position.z < 21.95) {
       avatar.position.z = pz < 21.6 ? 21.25 : 21.95;
     }
-    avatar.position.x = Math.max(avatar.position.z > 9 ? -9.8 : -9.9, Math.min(avatar.position.z > 9 ? 9.8 : 9.9, avatar.position.x));
+    avatar.position.x = Math.max(avatar.position.z > 9 ? -19.2 : -9.9, Math.min(avatar.position.z > 9 ? 19.2 : 9.9, avatar.position.x));
     if (avatar.position.z >= 21.95) avatar.position.x = Math.max(-1.5, Math.min(1.5, avatar.position.x));
     avatar.position.z = Math.max(-2.9, Math.min(26.4, avatar.position.z));
     resolveCollisions();
@@ -3078,6 +3162,7 @@ function addMine3D() {
 function openAdd3D(idx) {
   addPos = idx; pendingPhoto = null;
   document.getElementById("addPosLabel").textContent = posLabel(idx);
+  document.getElementById("addZoneLabel").textContent = idx >= 64 ? "Khu Thú Cưng" : (idx >= 32 ? "Dãy B" : "Dãy A");
   document.getElementById("photoPick").innerHTML = PICK_DEFAULT;
   document.getElementById("photoInput").value = "";
   ["newName", "newYears", "newSpecialDay", "newMsg", "newEmail"].forEach(function(id) { document.getElementById(id).value = ""; });
