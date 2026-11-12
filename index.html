@@ -5,6 +5,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>You Still Beside Me — Miếu Tưởng Niệm</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#a8402f">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="three.min.js"></script>
 <script src="gltf-loader.js"></script>
 <script src="buddha-model.js"></script>
@@ -768,6 +771,8 @@ function standUp() {
 }
 function kneelOn(spot) {
   if (!spot || !avatar) return;
+  ensureSpotIds();
+  if (seatTakenByOther(spot) && KNEELING !== spot) { toast("🙏 Nệm này có bạn đang quỳ rồi"); return; }
   KNEELING = spot;
   avatar.position.set(spot.x, spot.y + (typeof chibiSitDY === "function" ? chibiSitDY(spot) : 0), spot.z);
   avatar.rotation.y = spot.r;
@@ -2897,15 +2902,9 @@ function hsl2rgb(h, s, l) {
   }
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
-function applyChibiColors() {
-  if (!CHIBI.on) return;
-  var M = CHIBI_MODELS[myGender()];
-  if (!M || !M.root) return;
-  if (!M || !M.baseImg) return;
-  var C = myColors();
-  var key = myGender() + "|" + C.skin + "|" + C.hair + "|" + C.shirt;
-  if (CHIBI_TEX.key === key) return;
-  CHIBI_TEX.key = key;
+function buildColoredTexture(g, C) {
+  var M = CHIBI_MODELS[g];
+  if (!M || !M.baseImg || !C) return null;
   try {
     var SZ = 1024;
     var cv = document.createElement("canvas"); cv.width = SZ; cv.height = SZ;
@@ -2939,10 +2938,101 @@ function applyChibiColors() {
     var tex = new THREE.CanvasTexture(cv);
     tex.flipY = false;
     if (M.baseTex) { tex.encoding = M.baseTex.encoding; tex.wrapS = M.baseTex.wrapS; tex.wrapT = M.baseTex.wrapT; }
-    M.root.traverse(function(o) { if (o.isMesh && o.material && o.material.map) o.material.map = tex; });
-    if (CHIBI_TEX.tex) CHIBI_TEX.tex.dispose();
-    CHIBI_TEX.tex = tex;
-  } catch (e) { /* loi to mau thi giu texture goc */ }
+    return tex;
+  } catch (e) { return null; }
+}
+function applyChibiColors() {
+  if (!CHIBI.on) return;
+  var M = CHIBI_MODELS[myGender()];
+  if (!M || !M.root) return;
+  if (!M || !M.baseImg) return;
+  var C = myColors();
+  var key = myGender() + "|" + C.skin + "|" + C.hair + "|" + C.shirt;
+  if (CHIBI_TEX.key === key) return;
+  CHIBI_TEX.key = key;
+  var tex = buildColoredTexture(myGender(), C);
+  if (!tex) return;
+  M.root.traverse(function(o) { if (o.isMesh && o.material && o.material.map) o.material.map = tex; });
+  if (CHIBI_TEX.tex) CHIBI_TEX.tex.dispose();
+  CHIBI_TEX.tex = tex;
+}
+
+/* ===== NGUOI CHOI KHAC: NHAN VAT CHIBI THAT + GHE THEO LUOT (khong con model tho so) ===== */
+var SPOT_BY_ID = {};
+function ensureSpotIds() {
+  if (INTERACT.length && INTERACT[0].id) return;
+  INTERACT.forEach(function(sp, i) { sp.id = "sp" + i; SPOT_BY_ID[sp.id] = sp; });
+}
+function mySeatId() { var s = SITTING || KNEELING; return s && s.id ? s.id : null; }
+var occupiedSpots = {};
+function seatTakenByOther(spot) { return !!(spot && spot.id && occupiedSpots[spot.id]); }
+function remoteSitDY(o, spot) {
+  var M = CHIBI_MODELS[o.g === "nu" ? "nu" : "nam"];
+  if (!M) return 0;
+  if (spot.type === "kneel") return (o.actions && o.actions.kneel) ? (M.kneelDY != null ? M.kneelDY : 0.11) : -0.05;
+  var dy = M.sitDY != null ? M.sitDY : -0.1;
+  if (spot.y >= 0.24) dy -= 0.02;
+  return dy;
+}
+function setRemoteAnim(o, name) {
+  if (!o.actions || !o.actions[name] || o.cur === name) return;
+  var prev = o.cur ? o.actions[o.cur] : null;
+  var a = o.actions[name];
+  a.reset(); if (name === "unkneel") a.time = 5.5; a.fadeIn(0.22); a.play();
+  if (prev && prev !== a) prev.fadeOut(0.22);
+  o.cur = name;
+}
+function spawnRemoteChibi(id, e) {
+  var o = others[id];
+  if (!o || o.kind === "chibi" || o.building) return;
+  var g = e.g === "nu" ? "nu" : "nam";
+  var M = CHIBI_MODELS[g];
+  if (!M) return;
+  if (!M.baseImg) { loadChibiModel(g); return; }
+  o.building = true;
+  try {
+    var b64 = "";
+    for (var k = 1; k <= M.chunks.length; k++) b64 += window[M.prefix + k] || "";
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var bi = 0; bi < bin.length; bi++) bytes[bi] = bin.charCodeAt(bi);
+    new THREE.GLTFLoader().parse(bytes.buffer, "", function(gltf) {
+      var oo = others[id];
+      if (!oo) return;
+      var root = gltf.scene;
+      root.scale.setScalar(CHIBI_SCALE);
+      root.traverse(function(c) { if (c.isMesh) c.frustumCulled = false; });
+      var tex = buildColoredTexture(g, e.c || {});
+      if (tex) root.traverse(function(c) { if (c.isMesh && c.material && c.material.map) c.material.map = tex; });
+      var mixer = new THREE.AnimationMixer(root);
+      var actions = {};
+      gltf.animations.forEach(function(clip) {
+        var canon = null;
+        Object.keys(M.clips).forEach(function(k) { if (M.clips[k] === clip.name) canon = k; });
+        if (!canon) return;
+        var a = mixer.clipAction(clip);
+        if (canon === "sit" || canon === "stand" || canon === "kneel" || canon === "unkneel") { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; }
+        actions[canon] = a;
+      });
+      var hips = null;
+      root.traverse(function(c) { if (c.isBone && c.name.indexOf("Hips") >= 0) hips = c; });
+      oo.grp.add(root);
+      oo.body = root; oo.kind = "chibi"; oo.mixer = mixer; oo.actions = actions;
+      oo.hips = hips; oo.hipsBind = hips ? { x: hips.position.x, z: hips.position.z } : { x: 0, z: 0 };
+      oo.cur = ""; oo.building = false;
+      oo.colKey = g + "|" + (e.c ? e.c.skin : "") + "|" + (e.c ? e.c.hair : "") + "|" + (e.c ? e.c.shirt : "");
+    }, function() { var q = others[id]; if (q) q.building = false; });
+  } catch (err) { o.building = false; }
+}
+function disposeOther(o) {
+  if (!o) return;
+  scene.remove(o.grp);
+  if (o.body) o.body.traverse(function(c) {
+    if (c.isMesh) {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) { if (c.material.map && c.material.map.isCanvasTexture) c.material.map.dispose(); if (c.material.dispose) c.material.dispose(); }
+    }
+  });
 }
 function updateChibiAnim(dt, moving) {
   if (!CHIBI.on || !CHIBI.mixer) return;
@@ -3035,6 +3125,8 @@ function bindControls() {
 var raycaster = new THREE.Raycaster();
 function sitOn(spot) {
   if (!spot || !avatar) return;
+  ensureSpotIds();
+  if (seatTakenByOther(spot) && SITTING !== spot) { toast("💺 Ghế này có bạn đang ngồi rồi"); return; }
   SITTING = spot;
   avatar.position.set(spot.x, spot.y + (typeof chibiSitDY === "function" ? chibiSitDY(spot) : 0), spot.z);
   avatar.rotation.y = spot.r;
@@ -3996,10 +4088,13 @@ function sendPresence() {
   if (!avatar) return;
   var now = Date.now();
   var p = avatar.position, r = avatar.rotation.y;
-  var moved = Math.hypot(p.x - lastSentPos.x, p.z - lastSentPos.z) > 0.05 || Math.abs(r - lastSentPos.r) > 0.08;
+  ensureSpotIds();
+  var seatId = mySeatId();
+  var moved = Math.hypot(p.x - lastSentPos.x, p.z - lastSentPos.z) > 0.05 || Math.abs(r - lastSentPos.r) > 0.08 || seatId !== (window.__lastSeatSent || null);
   if (!moved && now - lastPresenceSent < 12000) return;
   lastPresenceSent = now; lastSentPos = { x: p.x, z: p.z, r: r };
-  dbPut("/presence/" + CLIENT_ID, { n: myName(), g: myGender(), x: +p.x.toFixed(2), z: +p.z.toFixed(2), r: +r.toFixed(2), c: myColors(), t: now });
+  window.__lastSeatSent = seatId;
+  dbPut("/presence/" + CLIENT_ID, { n: myName(), g: myGender(), x: +p.x.toFixed(2), z: +p.z.toFixed(2), r: +r.toFixed(2), c: myColors(), s: seatId, t: now });
 }
 function makeOtherAvatar(name, c, g) {
   var grp = new THREE.Group();
@@ -4021,7 +4116,7 @@ function makeOtherAvatar(name, c, g) {
 }
 function pollPresence() {
   dbGet("/presence").then(function(d) {
-    var now = Date.now(), fresh = 0, alive = {};
+    var now = Date.now(), fresh = 0, alive = {}, claims = {};
     if (d) {
       Object.keys(d).forEach(function(id) {
         var e = d[id];
@@ -4031,15 +4126,39 @@ function pollPresence() {
         alive[id] = true;
         var o = others[id];
         if (!o) {
-          o = others[id] = { grp: makeOtherAvatar(e.n, e.c, e.g), tx: e.x || 0, tz: e.z || 0, tr: e.r || 0 };
-          o.grp.position.set(e.x || 0, 0, e.z || 0);
+          var wgrp = new THREE.Group();
+          wgrp.position.set(e.x || 0, 0, e.z || 0);
+          var tg = new THREE.Sprite(new THREE.SpriteMaterial({ map: tagTexture(e.n || "Bạn"), transparent: true, depthWrite: false }));
+          tg.scale.set(1.5, 0.375, 1); tg.position.y = 1.98;
+          wgrp.add(tg); scene.add(wgrp);
+          o = others[id] = { grp: wgrp, tag: tg, body: null, kind: "loading", g: e.g === "nu" ? "nu" : "nam", tx: e.x || 0, tz: e.z || 0, tr: e.r || 0, seatId: null, prevSeatType: null, exitT: 0, exitClip: null, colKey: "" };
         }
         o.tx = e.x || 0; o.tz = e.z || 0; o.tr = e.r || 0;
+        o.seatId = e.s || null;
+        if (e.s) { (claims[e.s] = claims[e.s] || []).push(id); }
+        spawnRemoteChibi(id, e);
+        if (o.kind === "chibi" && o.body) {
+          var ck = (e.g === "nu" ? "nu" : "nam") + "|" + (e.c ? e.c.skin : "") + "|" + (e.c ? e.c.hair : "") + "|" + (e.c ? e.c.shirt : "");
+          if (o.colKey && o.colKey !== ck) {
+            var nt = buildColoredTexture(e.g === "nu" ? "nu" : "nam", e.c || {});
+            if (nt) { o.body.traverse(function(c) { if (c.isMesh && c.material && c.material.map) { if (c.material.map.isCanvasTexture) c.material.map.dispose(); c.material.map = nt; } }); o.colKey = ck; }
+          } else if (!o.colKey) o.colKey = ck;
+        }
       });
     }
+    occupiedSpots = {};
+    Object.keys(claims).forEach(function(sid) { occupiedSpots[sid] = claims[sid][0]; });
     Object.keys(others).forEach(function(id) {
-      if (!alive[id]) { scene.remove(others[id].grp); delete others[id]; }
+      if (!alive[id]) { disposeOther(others[id]); delete others[id]; }
     });
+    (function() {
+      var ms = mySeatId();
+      if (!ms || !claims[ms]) return;
+      var all = claims[ms].slice();
+      if (all.indexOf(CLIENT_ID) < 0) all.push(CLIENT_ID);
+      all.sort();
+      if (all[0] !== CLIENT_ID) { toast("Chỗ này có bạn khác đến trước rồi, mình nhường nhé 🌸"); standUp(); }
+    })();
     if (d) {
       var stale = Object.keys(d).filter(function(id) { return id !== CLIENT_ID && d[id] && d[id].t && now - d[id].t > 600000; }).slice(0, 3);
       stale.forEach(function(id) { dbDel("/presence/" + id); });
@@ -4058,6 +4177,28 @@ function updateOthers(dt) {
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
     o.grp.rotation.y += diff * Math.min(1, dt * 6);
+    if (o.kind !== "chibi" || !o.mixer) { o.grp.position.y += (0 - o.grp.position.y) * Math.min(1, dt * 6); return; }
+    ensureSpotIds();
+    var spot = o.seatId ? SPOT_BY_ID[o.seatId] : null;
+    var want = null, targetY = 0;
+    if (spot) {
+      want = spot.type === "kneel" ? "kneel" : "sit";
+      targetY = spot.y + remoteSitDY(o, spot);
+      o.prevSeatType = spot.type;
+      o.exitT = 0; o.exitClip = null;
+    } else if (o.prevSeatType) {
+      if (!o.exitClip) { o.exitClip = o.prevSeatType === "kneel" ? "unkneel" : "stand"; o.exitT = 1.15; }
+      if (o.exitT > 0) { o.exitT -= dt; want = o.exitClip; }
+      else { o.prevSeatType = null; o.exitClip = null; }
+    }
+    if (!want) {
+      var moved = Math.hypot(o.tx - o.grp.position.x, o.tz - o.grp.position.z);
+      want = moved > 0.12 ? "walk" : "idle";
+    }
+    setRemoteAnim(o, want);
+    o.mixer.update(dt);
+    if (o.hips) { o.hips.position.x = o.hipsBind.x; o.hips.position.z = o.hipsBind.z; }
+    o.grp.position.y += (targetY - o.grp.position.y) * Math.min(1, dt * 8);
   });
 }
 /* ---------- boc cac hanh dong de ghi len server ---------- */
