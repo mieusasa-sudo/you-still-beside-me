@@ -202,7 +202,7 @@
 
   <div class="hud-top">
     <div class="ttl">🕯️ You Still Beside Me<small data-i18n="subtitle">Miếu Tưởng Niệm · Dãy A — kéo để nhìn quanh, đi lại bằng phím hoặc joystick</small></div>
-    <span class="pill">👥 <span id="onlineCount">214</span> <span data-i18n="online">đang ở đây</span></span>
+    <span class="pill">👥 <span id="onlineCount">1</span> <span data-i18n="online">đang ở đây</span></span>
     <span class="pill">🪙 <span id="coinCount">0</span> <span data-i18n="coinUnit">xu</span></span>
     <button class="pill add" onclick="addMine3D()">＋ <span data-i18n="addMine">Thêm bé của tôi</span></button>
     <button class="pill" onclick="openCreator()">👤 <span data-i18n="creator">Tạo hình</span></button>
@@ -925,8 +925,7 @@ function buildRoom() {
   var ceil = new THREE.Mesh(new THREE.PlaneGeometry(23, 17), new THREE.MeshStandardMaterial({ color: 0x2a1a0e, roughness: 1 }));
   ceil.rotation.x = Math.PI / 2; ceil.position.set(0, 9.4, 0.5); scene.add(ceil);
   /* hai chau truc hai ben vach */
-  scene.add(makeBamboo(-9.6, -4.6, 1.15));
-  scene.add(makeBamboo(9.6, -4.6, 1.15));
+  /* (da xoa chau truc 2 goc vach theo y Nhien) */
 }
 function rebuildAvatar() {
   if (!avatar || !scene) return;
@@ -1087,8 +1086,7 @@ function buildDecor() {
   scene.add(makeBamboo(10.35, -1.5, 0.95));
   scene.add(makeBamboo(-10.35, 3.8, 0.9));
   scene.add(makeBamboo(10.35, 3.8, 1.1));
-  scene.add(makeBamboo(-9.9, 7.8, 1.0));
-  scene.add(makeBamboo(9.9, 7.8, 0.9));
+  /* (da xoa chau truc 2 goc cua theo y Nhien) */
   /* den long: hai day doc loi di + cap truoc vach */
   var lz = [-4.2, -0.6, 3.0];
   for (var i = 0; i < lz.length; i++) {
@@ -1106,9 +1104,7 @@ function buildDecor() {
   }
   var cl = [[-9.9, 7.55], [-9.45, 7.9], [-10.3, 7.95], [9.9, 7.55], [9.45, 7.9], [10.3, 7.95]];
   for (var cix = 0; cix < cl.length; cix++) scene.add(makeFloorCandle(cl[cix][0], cl[cix][1], 0.24 + (cix % 3) * 0.06));
-  /* chan nen cao hai ben vach */
-  scene.add(makeCandleStand(-8.8, -5.3));
-  scene.add(makeCandleStand(8.8, -5.3));
+  /* (da xoa chan nen cao 2 goc vach theo y Nhien) */
 }
 
 /* ================= CUA SAU + SAN VUON ================= */
@@ -1843,16 +1839,14 @@ function buildFacade() {
   /* dai lattice trang-do duoi mai tang tret */
   box(23.2, 0.62, 0.1, new THREE.MeshStandardMaterial({ map: latticeTexture(), roughness: 0.9 }), 0, 4.85, 9.2);
   /* mai tang tret: chi la mai hien phia truoc, khong dam vao phong trong */
-  box(26.4, 0.2, 2.2, slateD, 0, 5.32, 10.0);
-  box(25.6, 0.22, 2.0, slate, 0, 5.55, 9.95);
-  var p1 = pyr(12.75, 1.05, 1.5, slate); p1.position.set(0, 6.4, 9.95); scene.add(p1);
+  box(26.4, 0.2, 2.6, slateD, 0, 5.32, 9.85);
+  box(25.6, 0.24, 2.3, slate, 0, 5.56, 9.8);
   /* tang giua: dai do + o trang */
   box(23, 1.5, 0.05, verm, 0, 6.9, 9.17);
   [-7.8, -3.9, 0, 3.9, 7.8].forEach(function(cx) { box(2.6, 0.95, 0.04, whiteM, cx, 6.9, 9.2); });
   /* mai tang giua: cung chi o phia truoc */
-  box(23.5, 0.18, 2.1, slateD, 0, 7.72, 9.98);
-  box(22.7, 0.2, 1.9, slate, 0, 7.93, 9.93);
-  var p2 = pyr(11.3, 0.95, 1.3, slate); p2.position.set(0, 8.68, 9.93); scene.add(p2);
+  box(23.5, 0.18, 2.4, slateD, 0, 7.72, 9.83);
+  box(22.7, 0.22, 2.1, slate, 0, 7.94, 9.78);
   /* dai tren cung sat chan thap */
   box(23, 1.15, 0.05, verm, 0, 9.25, 9.17);
   [-6.5, 0, 6.5].forEach(function(cx) { box(3.4, 0.7, 0.04, whiteM, cx, 9.25, 9.2); });
@@ -3884,10 +3878,7 @@ function tickFeed() {
 loadState();
 tickFeed();
 setInterval(tickFeed, 8000);
-setInterval(function() {
-  if (window.SYNC_ONLINE) return;
-  document.getElementById("onlineCount").textContent = 200 + Math.floor(Math.random() * 40);
-}, 20000);
+/* so nguoi: chi dem nguoi that qua pollPresence (khong dung so gia) */
 if (typeof THREE === "undefined") {
   document.getElementById("bootMsg").innerHTML = "Không tải được thư viện 3D (THREE.js).<br>Kiểm tra kết nối mạng rồi tải lại trang nhé.";
 } else {
@@ -4039,7 +4030,6 @@ function pollPresence() {
         if (id === CLIENT_ID) return;
         alive[id] = true;
         var o = others[id];
-    o.grp.visible = showO;
         if (!o) {
           o = others[id] = { grp: makeOtherAvatar(e.n, e.c, e.g), tx: e.x || 0, tz: e.z || 0, tr: e.r || 0 };
           o.grp.position.set(e.x || 0, 0, e.z || 0);
@@ -4050,6 +4040,10 @@ function pollPresence() {
     Object.keys(others).forEach(function(id) {
       if (!alive[id]) { scene.remove(others[id].grp); delete others[id]; }
     });
+    if (d) {
+      var stale = Object.keys(d).filter(function(id) { return id !== CLIENT_ID && d[id] && d[id].t && now - d[id].t > 600000; }).slice(0, 3);
+      stale.forEach(function(id) { dbDel("/presence/" + id); });
+    }
     if (window.SYNC_ONLINE) document.getElementById("onlineCount").textContent = Math.max(1, fresh);
   });
 }
@@ -4057,6 +4051,7 @@ function updateOthers(dt) {
   var showO = settings().others;
   Object.keys(others).forEach(function(id) {
     var o = others[id];
+    o.grp.visible = showO;
     o.grp.position.x += (o.tx - o.grp.position.x) * Math.min(1, dt * 4);
     o.grp.position.z += (o.tz - o.grp.position.z) * Math.min(1, dt * 4);
     var diff = o.tr - o.grp.rotation.y;
