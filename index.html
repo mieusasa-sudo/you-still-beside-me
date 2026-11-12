@@ -4116,7 +4116,7 @@ function makeOtherAvatar(name, c, g) {
 }
 function pollPresence() {
   dbGet("/presence").then(function(d) {
-    var now = Date.now(), fresh = 0, alive = {}, claims = {};
+    var now = Date.now(), fresh = 0, alive = {}, claims = {}, spawnQueue = [];
     if (d) {
       Object.keys(d).forEach(function(id) {
         var e = d[id];
@@ -4136,7 +4136,7 @@ function pollPresence() {
         o.tx = e.x || 0; o.tz = e.z || 0; o.tr = e.r || 0;
         o.seatId = e.s || null;
         if (e.s) { (claims[e.s] = claims[e.s] || []).push(id); }
-        spawnRemoteChibi(id, e);
+        spawnQueue.push([id, e]);
         if (o.kind === "chibi" && o.body) {
           var ck = (e.g === "nu" ? "nu" : "nam") + "|" + (e.c ? e.c.skin : "") + "|" + (e.c ? e.c.hair : "") + "|" + (e.c ? e.c.shirt : "");
           if (o.colKey && o.colKey !== ck) {
@@ -4151,6 +4151,14 @@ function pollPresence() {
     Object.keys(others).forEach(function(id) {
       if (!alive[id]) { disposeOther(others[id]); delete others[id]; }
     });
+    if (avatar) {
+      spawnQueue.sort(function(a, b) {
+        var da = Math.hypot((a[1].x || 0) - avatar.position.x, (a[1].z || 0) - avatar.position.z);
+        var db = Math.hypot((b[1].x || 0) - avatar.position.x, (b[1].z || 0) - avatar.position.z);
+        return da - db;
+      });
+      spawnQueue.slice(0, 5).forEach(function(q) { spawnRemoteChibi(q[0], q[1]); });
+    }
     (function() {
       var ms = mySeatId();
       if (!ms || !claims[ms]) return;
@@ -4168,16 +4176,25 @@ function pollPresence() {
 }
 function updateOthers(dt) {
   var showO = settings().others;
+  if (avatar) {
+    Object.keys(others).sort(function(a, b) {
+      var oa = others[a], ob = others[b];
+      var da = Math.hypot(oa.tx - avatar.position.x, oa.tz - avatar.position.z);
+      var db = Math.hypot(ob.tx - avatar.position.x, ob.tz - avatar.position.z);
+      return da - db;
+    }).forEach(function(id, i) { others[id].nearRank = i; });
+  }
   Object.keys(others).forEach(function(id) {
     var o = others[id];
-    o.grp.visible = showO;
+    var visTop = o.nearRank == null || o.nearRank < 5;
+    o.grp.visible = showO && visTop;
     o.grp.position.x += (o.tx - o.grp.position.x) * Math.min(1, dt * 4);
     o.grp.position.z += (o.tz - o.grp.position.z) * Math.min(1, dt * 4);
     var diff = o.tr - o.grp.rotation.y;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
     o.grp.rotation.y += diff * Math.min(1, dt * 6);
-    if (o.kind !== "chibi" || !o.mixer) { o.grp.position.y += (0 - o.grp.position.y) * Math.min(1, dt * 6); return; }
+    if (o.kind !== "chibi" || !o.mixer || !visTop) { o.grp.position.y += (0 - o.grp.position.y) * Math.min(1, dt * 6); return; }
     ensureSpotIds();
     var spot = o.seatId ? SPOT_BY_ID[o.seatId] : null;
     var want = null, targetY = 0;
