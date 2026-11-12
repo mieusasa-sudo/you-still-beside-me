@@ -664,10 +664,13 @@ function buildColliders() {
   [[-2.9, 24.6], [2.9, 24.6], [-2.4, 22.7], [2.4, 22.7], [-2.3, 10.1], [2.3, 10.1]].forEach(function(pt) { circ(pt[0], pt[1], 0.3); });
   circ(4.1, -4.3, 0.45);
   circ(-8.9, 17.8, 0.26);
+  [[-9.3, 10.7], [9.3, 10.7], [-9.4, 15.9], [9.5, 18.9], [-3.2, 20.9], [4.6, 21.0]].forEach(function(pt) { circ(pt[0], pt[1], 0.34); });
   circ(-6.4, 11.6, 0.42); circ(6.4, 11.6, 0.42);
   C.boxes.push({ x: 6.8, z: 13.5, rot: 0, hx: 0.92, hz: 0.38 });
   C.boxes.push({ x: 6.8, z: 17.1, rot: Math.PI, hx: 0.92, hz: 0.38 });
   C.boxes.push({ x: 0, z: -5.62, rot: 0, hx: 3.7, hz: 2.38 });
+  C.boxes.push({ x: -5.85, z: 12.55, rot: 0, hx: 3.85, hz: 0.12 });
+  C.boxes.push({ x: 5.85, z: 12.55, rot: 0, hx: 3.85, hz: 0.12 });
 
   C.ellipses.push({ x: -6.4, z: 15.2, rx: 2.35, rz: 1.95 });
   C.built = true;
@@ -1473,12 +1476,17 @@ function buildPond() {
 }
 function makeBlossomTree(x, z, sc) {
   var g = new THREE.Group();
-  var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.09 * sc, 0.14 * sc, 1.3 * sc, 7), new THREE.MeshStandardMaterial({ color: 0x4c3a28, roughness: 1 }));
-  trunk.position.y = 0.65 * sc; g.add(trunk);
-  var cols = [0xe8a0bf, 0xf2b8d0, 0xdd8fb4];
-  [[0, 1.75, 0, 0.85], [0.5, 1.5, 0.2, 0.6], [-0.5, 1.55, -0.15, 0.62], [0.1, 2.05, -0.2, 0.55]].forEach(function(b, bi) {
-    var blob = new THREE.Mesh(new THREE.SphereGeometry(b[3] * sc, 10, 8), new THREE.MeshStandardMaterial({ color: cols[bi % 3], roughness: 1, flatShading: true }));
-    blob.scale.y = 0.72;
+  var trunkM = new THREE.MeshStandardMaterial({ color: 0x3d2c1e, roughness: 1 });
+  var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * sc, 0.18 * sc, 2.1 * sc, 7), trunkM);
+  trunk.position.y = 1.05 * sc; trunk.rotation.z = 0.06; g.add(trunk);
+  var br1 = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * sc, 0.09 * sc, 1.1 * sc, 6), trunkM);
+  br1.position.set(0.42 * sc, 2.35 * sc, 0.05 * sc); br1.rotation.z = -0.7; g.add(br1);
+  var br2 = new THREE.Mesh(new THREE.CylinderGeometry(0.045 * sc, 0.08 * sc, 0.95 * sc, 6), trunkM);
+  br2.position.set(-0.38 * sc, 2.3 * sc, -0.08 * sc); br2.rotation.z = 0.75; g.add(br2);
+  var cols = [0xf2a7c3, 0xf7c3d6, 0xee93b8, 0xf9d3e0, 0xe87fa5];
+  [[0, 2.85, 0, 0.95], [0.85, 2.55, 0.25, 0.66], [-0.85, 2.6, -0.2, 0.68], [0.45, 3.05, -0.4, 0.6], [-0.4, 3.1, 0.35, 0.58], [1.05, 2.8, -0.35, 0.5], [-1.05, 2.85, 0.3, 0.52], [0.05, 3.3, -0.05, 0.62]].forEach(function(b, bi) {
+    var blob = new THREE.Mesh(new THREE.SphereGeometry(b[3] * sc, 10, 8), new THREE.MeshStandardMaterial({ color: cols[bi % 5], roughness: 1, flatShading: true }));
+    blob.scale.y = 0.62;
     blob.position.set(b[0] * sc, b[1] * sc, b[2] * sc);
     g.add(blob);
   });
@@ -1742,15 +1750,78 @@ function buildPagoda() {
   orb.position.set(0, top + 1.95, cz); scene.add(orb);
   var spike = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.8, 8), gold);
   spike.position.set(0, top + 2.4, cz); scene.add(spike);
-  var canLip = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.16, 3.1), slate);
-  canLip.position.set(0, 4.35, 9.75); scene.add(canLip);
-  var canopy = pyramid(2.7, 1.5, 0.95);
-  canopy.position.set(0, 4.9, 9.75); scene.add(canopy);
-  [-1.6, 1.6].forEach(function(px) {
-    var post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 4.3, 0.14), slateD);
-    post.position.set(px, 2.15, 10.35); scene.add(post);
+}
+
+/* ===== MAT TIEN CHUA THEO ANH MAU: do son + trang + mai ngoi xam + be da ===== */
+function latticeTexture() {
+  var tx = makeTex(256, 128, function(x, W, H) {
+    x.fillStyle = "#f7efdd"; x.fillRect(0, 0, W, H);
+    x.strokeStyle = "#a8402f"; x.lineWidth = 7;
+    for (var gx = 0; gx <= W; gx += 32) { x.beginPath(); x.moveTo(gx, 0); x.lineTo(gx, H); x.stroke(); }
+    for (var gy = 0; gy <= H; gy += 32) { x.beginPath(); x.moveTo(0, gy); x.lineTo(W, gy); x.stroke(); }
+  });
+  tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.repeat.set(14, 1);
+  return tx;
+}
+function doorSlatTexture() {
+  return makeTex(128, 256, function(x, W, H) {
+    x.fillStyle = "#211d1a"; x.fillRect(0, 0, W, H);
+    for (var gx = 8; gx < W; gx += 16) { x.fillStyle = "#3d362e"; x.fillRect(gx, 0, 5, H); x.fillStyle = "#14110e"; x.fillRect(gx + 5, 0, 3, H); }
+    x.fillStyle = "#0f0c0a"; x.fillRect(0, H * 0.46, W, 12); x.fillRect(0, 0, W, 8); x.fillRect(0, H - 8, W, 8);
   });
 }
+function doorSlatMat() { return new THREE.MeshStandardMaterial({ map: doorSlatTexture(), roughness: 0.85 }); }
+function buildFacade() {
+  var verm = new THREE.MeshStandardMaterial({ color: 0xa8402f, roughness: 0.85 });
+  var vermD = new THREE.MeshStandardMaterial({ color: 0x8a3325, roughness: 0.9 });
+  var whiteM = new THREE.MeshStandardMaterial({ color: 0xf3ead9, roughness: 0.95 });
+  var slate = new THREE.MeshStandardMaterial({ color: 0x3c434c, roughness: 0.9 });
+  var slateD = new THREE.MeshStandardMaterial({ color: 0x2b3036, roughness: 1 });
+  var stone = new THREE.MeshStandardMaterial({ color: 0x565b63, roughness: 1 });
+  var stoneD = new THREE.MeshStandardMaterial({ color: 0x3a3e44, roughness: 1 });
+  function pyr(w, d, h, mat) { var m = new THREE.Mesh(new THREE.ConeGeometry(1.4142, h, 4), mat); m.rotation.y = Math.PI / 4; m.scale.set(w, 1, d); return m; }
+  function box(w, h, d, mat, x, y, z) { var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); scene.add(m); return m; }
+  /* tang tret: tuong trang 2 ben cua + cot do son */
+  [-6.62, 6.62].forEach(function(cx) { box(9.76, 4.35, 0.06, whiteM, cx, 2.17, 9.18); });
+  box(3.46, 0.78, 0.06, whiteM, 0, 3.96, 9.18);
+  box(23.2, 0.3, 0.18, vermD, 0, 0.15, 9.22);
+  box(23.2, 0.34, 0.18, verm, 0, 4.5, 9.22);
+  [-11.3, -8.2, -5.1, -2.05, 2.05, 5.1, 8.2, 11.3].forEach(function(cx) { box(0.34, 4.35, 0.16, verm, cx, 2.17, 9.24); });
+  /* cua so song den 2 ben */
+  var slatTex = doorSlatTexture();
+  [-3.57, -6.65, 3.57, 6.65].forEach(function(cx) {
+    box(1.15, 1.6, 0.07, vermD, cx, 2.3, 9.22);
+    var win = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 1.4), new THREE.MeshStandardMaterial({ map: slatTex, roughness: 0.85 }));
+    win.position.set(cx, 2.3, 9.27); scene.add(win);
+  });
+  /* dai lattice trang-do duoi mai tang tret */
+  box(23.2, 0.62, 0.1, new THREE.MeshStandardMaterial({ map: latticeTexture(), roughness: 0.9 }), 0, 4.85, 9.2);
+  /* mai tang tret */
+  box(26.4, 0.2, 19.4, slateD, 0, 5.32, 1.25);
+  box(25.6, 0.22, 18.6, slate, 0, 5.55, 1.25);
+  var p1 = pyr(12.75, 9.25, 1.5, slate); p1.position.set(0, 6.4, 1.25); scene.add(p1);
+  /* tang giua: dai do + o trang */
+  box(23, 1.5, 0.05, verm, 0, 6.9, 9.17);
+  [-7.8, -3.9, 0, 3.9, 7.8].forEach(function(cx) { box(2.6, 0.95, 0.04, whiteM, cx, 6.9, 9.2); });
+  /* mai tang giua */
+  box(23.5, 0.18, 18.2, slateD, 0, 7.72, 1.25);
+  box(22.7, 0.2, 17.4, slate, 0, 7.93, 1.25);
+  var p2 = pyr(11.3, 8.6, 1.3, slate); p2.position.set(0, 8.68, 1.25); scene.add(p2);
+  /* dai tren cung sat chan thap */
+  box(23, 1.15, 0.05, verm, 0, 9.25, 9.17);
+  [-6.5, 0, 6.5].forEach(function(cx) { box(3.4, 0.7, 0.04, whiteM, cx, 9.25, 9.2); });
+  /* be da quanh chan chua + san da truoc cua */
+  [-6.85, 6.85].forEach(function(cx) { box(9.6, 0.52, 0.5, stoneD, cx, 0.26, 9.32); });
+  box(21, 0.09, 3.6, stone, 0, 0.045, 11.15);
+  box(21, 0.13, 0.18, stoneD, 0, 0.065, 12.92);
+  /* lan can do hai ben bac them */
+  [-1, 1].forEach(function(sd) {
+    [2.2, 4.7, 7.2, 9.5].forEach(function(px) { box(0.09, 0.8, 0.09, verm, sd * px, 0.49, 12.55); });
+    box(7.7, 0.07, 0.05, verm, sd * 5.85, 0.9, 12.55);
+    box(7.7, 0.06, 0.05, verm, sd * 5.85, 0.52, 12.55);
+  });
+}
+
 function buildYard() {
   var panelMat = new THREE.MeshStandardMaterial({ map: panelTexture(), roughness: 0.9 });
   var woodMat = new THREE.MeshStandardMaterial({ map: woodDarkTexture(), roughness: 0.75 });
@@ -1760,9 +1831,9 @@ function buildYard() {
   var segR = segL.clone(); segR.position.x = 6.475; scene.add(segR);
   var lintel = new THREE.Mesh(new THREE.BoxGeometry(2.9, 6.4, 0.3), panelMat);
   lintel.position.set(0, 6.8, 9); scene.add(lintel);
-  var frameT = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.28, 0.5), woodMat);
+  var frameT = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.28, 0.5), new THREE.MeshStandardMaterial({ color: 0xa8402f, roughness: 0.85 }));
   frameT.position.set(0, 3.72, 9); scene.add(frameT);
-  var frameL = new THREE.Mesh(new THREE.BoxGeometry(0.28, 3.75, 0.5), woodMat);
+  var frameL = new THREE.Mesh(new THREE.BoxGeometry(0.28, 3.75, 0.5), new THREE.MeshStandardMaterial({ color: 0xa8402f, roughness: 0.85 }));
   frameL.position.set(-1.59, 1.87, 9); scene.add(frameL);
   var frameR = frameL.clone(); frameR.position.x = 1.59; scene.add(frameR);
   var step = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.14, 1.1), new THREE.MeshStandardMaterial({ color: 0x6e6255, roughness: 1 }));
@@ -1771,18 +1842,19 @@ function buildYard() {
   function doorPanel(side) {
     var hinge = new THREE.Group();
     hinge.position.set(side * 1.45, 0, 9);
-    var panel = new THREE.Mesh(new THREE.BoxGeometry(1.42, 3.5, 0.09), woodMat);
-    panel.position.set(-side * 0.71, 1.78, 0);
+    var panel = new THREE.Mesh(new THREE.BoxGeometry(1.45, 3.56, 0.09), doorSlatMat());
+    panel.position.set(-side * 0.725, 1.79, 0);
     hinge.add(panel);
     var knob = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), new THREE.MeshStandardMaterial({ color: 0xc9a24d, roughness: 0.35, metalness: 0.6 }));
     knob.position.set(-side * 1.28, 1.75, 0.1);
     hinge.add(knob);
-    hinge.rotation.y = side * 0.05;
+    hinge.rotation.y = 0;
     return hinge;
   }
   scene.add(doorPanel(-1));
   scene.add(doorPanel(1));
   buildPagoda();
+  buildFacade();
   /* nen san: loi da giua + co hai ben */
   var pathTex = stoneTexture();
   pathTex.wrapS = pathTex.wrapT = THREE.RepeatWrapping; pathTex.repeat.set(1, 6);
@@ -1845,6 +1917,14 @@ function buildYard() {
   scene.add(makeBlossomTree(5.3, 25.6, 1.2));
   scene.add(makeHeroBlossom(-6.4, 11.6));
   scene.add(makeHeroBlossom(6.4, 11.6));
+  scene.add(makeBlossomTree(-9.3, 10.7, 1.25));
+  scene.add(makeBlossomTree(9.3, 10.7, 1.25));
+  scene.add(makeBlossomTree(-9.4, 15.9, 1.1));
+  scene.add(makeBlossomTree(9.5, 18.9, 1.15));
+  scene.add(makeBlossomTree(-3.2, 20.9, 1.05));
+  scene.add(makeBlossomTree(4.6, 21.0, 1.1));
+  scene.add(makeBlossomTree(-4.3, 23.8, 1.2));
+  scene.add(makeBlossomTree(3.6, 25.2, 1.05));
   scene.add(makeBamboo(-4.6, 20.6, 1.15));
   scene.add(makeBamboo(4.6, 20.6, 1.0));
   scene.add(makeStoneLantern(-2.4, 22.7));
