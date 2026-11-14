@@ -8,6 +8,20 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#a8402f">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<script>
+/* ===== QUANG CAO THẬT: GameMonetize — điền GameId (32 ký tự) vào GM_GAME_ID khi có ===== */
+window.GM_GAME_ID = "9lm5ud4tmmilspox9yn1lb7jn74f0tkq";
+window.SDK_OPTIONS = {
+  gameId: window.GM_GAME_ID,
+  onEvent: function (a) {
+    if (a.name === "SDK_GAME_PAUSE") { if (window.__gmOnPause) window.__gmOnPause(); }
+    else if (a.name === "SDK_GAME_START") { if (window.__gmOnStart) window.__gmOnStart(); }
+  }
+};
+if (window.GM_GAME_ID && window.GM_GAME_ID.length >= 20) {
+  (function (d, b, c) { var t = d.getElementsByTagName(b)[0]; if (!d.getElementById(c)) { var s = d.createElement(b); s.id = c; s.src = "https://api.gamemonetize.com/sdk.js"; t.parentNode.insertBefore(s, t); } })(document, "script", "gamemonetize-sdk");
+}
+</script>
 <script src="three.min.js"></script>
 <script src="gltf-loader.js"></script>
 <script src="buddha-model.js"></script>
@@ -3717,12 +3731,38 @@ function chooseFlower(id) {
   if (f && f.free) actFlower(id);
   else watchAd({ kind: "flower", id: id });
 }
-var adPending = null, adInt = null;
+var adPending = null, adInt = null, adSdkT = null, adChkT = null;
+function audioPauseForAd(on) {
+  try {
+    if (!AC) return;
+    if (on && AC.state === "running") AC.suspend();
+    if (!on && AC.state === "suspended") AC.resume();
+  } catch (e) {}
+}
 function watchAd(pending) {
   adPending = pending;
   document.getElementById("adPanel").style.display = "flex";
   document.getElementById("adDone").style.display = "none";
   var fill = document.getElementById("adFill"), cnt = document.getElementById("adCount");
+  clearInterval(adInt); clearTimeout(adSdkT); clearTimeout(adChkT);
+  if (typeof sdk !== "undefined" && sdk && typeof sdk.showBanner === "function" && window.GM_GAME_ID) {
+    /* QUANG CAO THAT (GameMonetize): phat video -> SDK_GAME_START -> cho nhan thuong */
+    fill.style.width = "100%"; cnt.textContent = "Đang phát quảng cáo…";
+    var adStarted = false;
+    window.__gmOnPause = function() { adStarted = true; audioPauseForAd(true); };
+    window.__gmOnStart = function() {
+      audioPauseForAd(false); clearTimeout(adSdkT); clearTimeout(adChkT);
+      cnt.textContent = "Đã xem xong!";
+      document.getElementById("adDone").style.display = "";
+    };
+    adSdkT = setTimeout(function() { if (window.__gmOnStart) window.__gmOnStart(); }, 90000);
+    adChkT = setTimeout(function() { if (!adStarted) { clearTimeout(adSdkT); mockAd(fill, cnt); } }, 7000);
+    try { sdk.showBanner(); } catch (e) { clearTimeout(adSdkT); clearTimeout(adChkT); mockAd(fill, cnt); }
+    return;
+  }
+  mockAd(fill, cnt);
+}
+function mockAd(fill, cnt) {
   var left = 50;
   fill.style.width = "0%"; cnt.textContent = "Còn 5 giây";
   clearInterval(adInt);
@@ -3740,7 +3780,8 @@ function finishAd() {
   if (p.kind === "flower") actFlower(p.id); else actGift(p.id);
 }
 function cancelAd() {
-  clearInterval(adInt); adPending = null;
+  clearInterval(adInt); clearTimeout(adSdkT); clearTimeout(adChkT); adPending = null;
+  window.__gmOnStart = null; window.__gmOnPause = null; audioPauseForAd(false);
   document.getElementById("adPanel").style.display = "none";
 }
 var pfBackup = null;
