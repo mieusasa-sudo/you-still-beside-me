@@ -601,7 +601,7 @@ function init3D() {
 /* ===== Am thanh: nhac nen chua lanh + hieu ung ===== */
 var AC = null, musicBus = null, sfxBus = null, ambBus = null, ambOn = false;
 function audioInit() {
-  if (AC) { if (AC.state === "suspended") AC.resume(); return; }
+  if (AC) { if (!window.__adPlaying && AC.state !== "running") AC.resume(); return; }
   try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
   var st = settings();
   musicBus = AC.createGain(); musicBus.gain.value = st.music ? 0.32 : 0; musicBus.connect(AC.destination);
@@ -614,6 +614,7 @@ function audioInit() {
   var ng = AC.createGain(); ng.gain.value = 0.008;
   ns.connect(nf); nf.connect(ng); ng.connect(musicBus); ns.start();
   ambStart();
+  startPad();
 }
 /* ===== AM THANH THIEN NHIEN: suoi roc rach + de keu + ech keu (tong hop WebAudio) ===== */
 function ambStart() {
@@ -688,14 +689,45 @@ function pluckNote() {
   MEL_I = Math.max(0, Math.min(MEL_SCALE.length - 1, MEL_I + Math.floor(Math.random() * 5) - 2));
   var f = MEL_SCALE[MEL_I];
   var t0 = AC.currentTime;
-  [[1, 0.055, "triangle"], [2, 0.02, "sine"], [3, 0.008, "sine"]].forEach(function(h) {
+  [[1, 0.034, "triangle"], [2, 0.011, "sine"], [3, 0.004, "sine"]].forEach(function(h) {
     var o = AC.createOscillator(); o.type = h[2]; o.frequency.value = f * h[0];
     var g = AC.createGain();
-    g.gain.setValueAtTime(h[1], t0);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.4);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(h[1], t0 + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 3.4);
     o.connect(g); g.connect(musicBus);
-    o.start(t0); o.stop(t0 + 2.5);
+    o.start(t0); o.stop(t0 + 3.6);
   });
+}
+/* ===== Nen pad hop am am ap (nhac thien): Am - F - C - G, chuyen cham ===== */
+var PAD_CHORDS = [[110, 164.81, 220, 261.63], [87.31, 130.81, 174.61, 220], [130.81, 196, 261.63, 329.63], [98, 146.83, 196, 246.94]];
+var padIdx = 0, padStarted = false;
+function startPad() {
+  if (padStarted || !AC || !musicBus) return; padStarted = true;
+  padChord();
+}
+function padChord() {
+  if (!AC || !musicBus) return;
+  if (settings().music) {
+    var ch = PAD_CHORDS[padIdx % PAD_CHORDS.length];
+    var t0 = AC.currentTime, dur = 13;
+    ch.forEach(function(fr, ni) {
+      [0, 4].forEach(function(det) {
+        var o = AC.createOscillator(); o.type = ni === 0 ? "sine" : "triangle";
+        o.frequency.value = fr; o.detune.value = det;
+        var g = AC.createGain();
+        var peak = ni === 0 ? 0.016 : 0.010;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(peak, t0 + 3.2);
+        g.gain.setValueAtTime(peak, t0 + dur - 3.4);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        o.connect(g); g.connect(musicBus);
+        o.start(t0); o.stop(t0 + dur + 0.1);
+      });
+    });
+  }
+  padIdx++;
+  setTimeout(padChord, 11500);
 }
 function knockSfx() {
   if (!AC || !sfxBus || !settings().sfx) return;
@@ -3245,9 +3277,9 @@ function animate() {
   if (uiTick > 0.2) { uiTick = 0; updateContextUI(); }
   if (AC && settings().music) {
     bellTimer -= dt;
-    if (bellTimer <= 0) { bellTimer = 6 + Math.random() * 8; pluckNote(); }
+    if (bellTimer <= 0) { bellTimer = 9 + Math.random() * 8; pluckNote(); }
     templeTimer -= dt;
-    if (templeTimer <= 0) { templeTimer = 55 + Math.random() * 35; bellTone(98, 0.07, 7); }
+    if (templeTimer <= 0) { templeTimer = 95 + Math.random() * 55; bellTone(98, 0.04, 7); }
   }
   if (MO_RING) {
     MO_RING.t += dt;
@@ -3735,8 +3767,16 @@ var adPending = null, adInt = null, adSdkT = null, adChkT = null;
 function audioPauseForAd(on) {
   try {
     if (!AC) return;
-    if (on && AC.state === "running") AC.suspend();
-    if (!on && AC.state === "suspended") AC.resume();
+    if (on) {
+      window.__adPlaying = true;
+      if (AC.state === "running") AC.suspend();
+      clearTimeout(window.__adWatch);
+      window.__adWatch = setTimeout(function() { audioPauseForAd(false); }, 15000);
+    } else {
+      window.__adPlaying = false;
+      clearTimeout(window.__adWatch);
+      if (AC.state !== "running") AC.resume();
+    }
   } catch (e) {}
 }
 function watchAd(pending) {
