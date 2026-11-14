@@ -53,6 +53,8 @@ if (window.GM_GAME_ID && window.GM_GAME_ID.length >= 20) {
   #speedBtn { right: 12px; bottom: 118px; background: #6d4c26; color: #ffe9bb; font-size: 14px; padding: 10px 16px; }
   #chatBtn { position: absolute; right: 12px; bottom: 172px; z-index: 6; border: none; cursor: pointer; font-family: inherit; font-weight: 700; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.45); background: #a8402f; color: #ffe9bb; font-size: 14px; padding: 10px 16px; }
   #chatBadge { display: none; background: #ffd94d; color: #7a2d1d; border-radius: 999px; font-size: 11px; padding: 1px 6px; margin-left: 5px; }
+  #chatPop { position: absolute; right: 12px; bottom: 224px; z-index: 6; max-width: 250px; background: rgba(253,246,236,.96); color: #43301b; border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.4); padding: 9px 13px; font-size: 13.5px; line-height: 1.4; display: none; cursor: pointer; }
+  #chatPop .cn { font-weight: 700; color: #a8402f; }
   #chatPanel { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; width: min(520px, 100%); max-height: 62vh; background: #fdf6ec; border-radius: 18px 18px 0 0; box-shadow: 0 -12px 40px rgba(0,0,0,.45); z-index: 60; display: none; flex-direction: column; font-family: inherit; color: #43301b; }
   #chatPanel .cp-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 8px; font-family: Georgia, serif; font-weight: 700; font-size: 16.5px; }
   #chatPanel .cp-head button { border: none; background: #efe0c8; border-radius: 999px; width: 30px; height: 30px; cursor: pointer; font-size: 14px; }
@@ -392,6 +394,7 @@ if (window.GM_GAME_ID && window.GM_GAME_ID.length >= 20) {
   <div id="fadeScreen"></div>
   <button id="speedBtn" onclick="cycleSpeed()">🚶 x1</button>
   <button id="chatBtn" onclick="toggleChat()">💬 Chat<span id="chatBadge"></span></button>
+  <div id="chatPop" onclick="toggleChat()"></div>
   <div id="chatPanel">
     <div class="cp-head"><span>💬 Trò chuyện ở miếu</span><button onclick="toggleChat()">✕</button></div>
     <div id="chatMsgs"></div>
@@ -3680,11 +3683,22 @@ function boxNav(d) {
 }
 /* ===== CHAT CHUNG O MIEU (Firebase /chat, giu 5 ngay) ===== */
 var CHAT_KEEP_MS = 5 * 24 * 3600 * 1000;
-var chatOpen = false, chatLastSeen = 0, chatBusy = false;
+var chatOpen = false, chatLastSeen = 0, chatBusy = false, chatCache = [], chatLastT = 0, chatPopTimer = null;
+function chatPop(m) {
+  var el = document.getElementById("chatPop");
+  if (!el || chatOpen) return;
+  el.innerHTML = "";
+  var nm = document.createElement("span"); nm.className = "cn"; nm.textContent = "💬 " + (m.n || "Khách");
+  var tx = document.createElement("span"); tx.textContent = ": " + (m.m || "");
+  el.appendChild(nm); el.appendChild(tx);
+  el.style.display = "block";
+  clearTimeout(chatPopTimer);
+  chatPopTimer = setTimeout(function() { el.style.display = "none"; }, 6500);
+}
 function toggleChat() {
   chatOpen = !chatOpen;
   document.getElementById("chatPanel").style.display = chatOpen ? "flex" : "none";
-  if (chatOpen) { chatLastSeen = Date.now(); updChatBadge(); fetchChat(true); setTimeout(function() { var i = document.getElementById("chatText"); if (i) i.focus(); }, 80); }
+  if (chatOpen) { document.getElementById("chatPop").style.display = "none"; chatLastSeen = Date.now(); updChatBadge(); if (chatCache.length) renderChat(chatCache); fetchChat(true); setTimeout(function() { var i = document.getElementById("chatText"); if (i) i.focus(); }, 80); }
 }
 function updChatBadge() { var b = document.getElementById("chatBadge"); if (b) b.style.display = "none"; }
 function chatEsc(s) { return String(s == null ? "" : s).slice(0, 300); }
@@ -3725,6 +3739,10 @@ function fetchChat(scroll) {
     if (list.length > 200) list = list.slice(list.length - 200);
     stale.slice(0, 6).forEach(function(k) { dbDel("/chat/" + k); });
     var newest = list.length ? list[list.length - 1].t : 0;
+    var fresh = list.filter(function(m) { return m.t > chatLastT; });
+    chatCache = list;
+    if (fresh.length && !chatOpen) chatPop(fresh[fresh.length - 1]);
+    if (newest > chatLastT) chatLastT = newest;
     if (!chatOpen && newest > chatLastSeen && chatLastSeen > 0) {
       var b = document.getElementById("chatBadge");
       if (b) { b.style.display = "inline-block"; b.textContent = "mới"; }
