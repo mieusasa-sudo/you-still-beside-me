@@ -51,6 +51,19 @@ if (window.GM_GAME_ID && window.GM_GAME_ID.length >= 20) {
   #doorBtn { left: 50%; transform: translateX(-50%); bottom: 150px; background: #a8402f; color: #fff2e6; font-size: 15px; padding: 11px 20px; }
   #fadeScreen { position: fixed; inset: 0; background: #20131c; opacity: 0; pointer-events: none; transition: opacity 0.28s ease; z-index: 9000; }
   #speedBtn { right: 12px; bottom: 118px; background: #6d4c26; color: #ffe9bb; font-size: 14px; padding: 10px 16px; }
+  #chatBtn { position: absolute; right: 12px; bottom: 172px; z-index: 6; border: none; cursor: pointer; font-family: inherit; font-weight: 700; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.45); background: #a8402f; color: #ffe9bb; font-size: 14px; padding: 10px 16px; }
+  #chatBadge { display: none; background: #ffd94d; color: #7a2d1d; border-radius: 999px; font-size: 11px; padding: 1px 6px; margin-left: 5px; }
+  #chatPanel { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; width: min(520px, 100%); max-height: 62vh; background: #fdf6ec; border-radius: 18px 18px 0 0; box-shadow: 0 -12px 40px rgba(0,0,0,.45); z-index: 60; display: none; flex-direction: column; font-family: inherit; color: #43301b; }
+  #chatPanel .cp-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 8px; font-family: Georgia, serif; font-weight: 700; font-size: 16.5px; }
+  #chatPanel .cp-head button { border: none; background: #efe0c8; border-radius: 999px; width: 30px; height: 30px; cursor: pointer; font-size: 14px; }
+  #chatMsgs { overflow-y: auto; padding: 4px 16px 10px; flex: 1; min-height: 120px; }
+  .cmsg { margin: 7px 0; font-size: 14px; line-height: 1.45; }
+  .cmsg .cn { font-weight: 700; color: #a8402f; }
+  .cmsg .ct { color: #a08b6d; font-size: 11.5px; margin-left: 6px; }
+  .cmsg.me .cn { color: #2f7a4d; }
+  #chatPanel .cp-input { display: flex; gap: 8px; padding: 10px 12px 14px; border-top: 1px solid #eadfc8; }
+  #chatText { flex: 1; border: 1.5px solid #d9c8a3; border-radius: 999px; padding: 9px 14px; font-size: 14.5px; font-family: inherit; background: #fff; color: #43301b; }
+  #chatSend { border: none; background: #a8402f; color: #ffe9bb; font-weight: 700; border-radius: 999px; padding: 9px 18px; cursor: pointer; font-family: inherit; }
   #settingsPanel { position: absolute; inset: 0; background: rgba(20,12,6,.55); display: none; align-items: center; justify-content: center; z-index: 47; }
   .setrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px dashed #d9c39a; font-size: 14.5px; }
   .setbtn { border: 1.5px solid #a97e4f; background: #fff7e8; color: #6d4c26; border-radius: 999px; padding: 5px 14px; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 13px; }
@@ -378,6 +391,12 @@ if (window.GM_GAME_ID && window.GM_GAME_ID.length >= 20) {
   <button id="doorBtn" onclick="onDoorBtn()" style="display:none"></button>
   <div id="fadeScreen"></div>
   <button id="speedBtn" onclick="cycleSpeed()">🚶 x1</button>
+  <button id="chatBtn" onclick="toggleChat()">💬 Chat<span id="chatBadge"></span></button>
+  <div id="chatPanel">
+    <div class="cp-head"><span>💬 Trò chuyện ở miếu</span><button onclick="toggleChat()">✕</button></div>
+    <div id="chatMsgs"></div>
+    <div class="cp-input"><input id="chatText" maxlength="300" placeholder="Nhắn gì đó với mọi người…" autocomplete="off"><button id="chatSend" onclick="sendChat()">Gửi</button></div>
+  </div>
   <div class="toast" id="toast"></div>
   <div id="fxFloat"></div>
   <div id="boot"><div class="big">🕯️</div><p id="bootMsg">Đang dựng miếu…<br>Nếu đợi lâu quá, kiểm tra mạng rồi tải lại trang nhé.</p></div>
@@ -604,7 +623,7 @@ function audioInit() {
   if (AC) { if (!window.__adPlaying && AC.state !== "running") AC.resume(); return; }
   try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
   var st = settings();
-  musicBus = AC.createGain(); musicBus.gain.value = st.music ? 0.32 : 0; musicBus.connect(AC.destination);
+  musicBus = AC.createGain(); musicBus.gain.value = st.music ? 0.5 : 0; musicBus.connect(AC.destination);
   sfxBus = AC.createGain(); sfxBus.gain.value = st.sfx ? 0.85 : 0; sfxBus.connect(AC.destination);
   var nb = AC.createBuffer(1, AC.sampleRate * 2, AC.sampleRate);
   var nd = nb.getChannelData(0);
@@ -629,6 +648,10 @@ function ambStart() {
   var lfo = AC.createOscillator(); lfo.frequency.value = 0.11;
   var lg = AC.createGain(); lg.gain.value = 150;
   lfo.connect(lg); lg.connect(f.frequency); lfo.start();
+  var rsrc = AC.createBufferSource(); rsrc.buffer = buf; rsrc.loop = true; rsrc.playbackRate.value = 1.7;
+  var rf = AC.createBiquadFilter(); rf.type = "bandpass"; rf.frequency.value = 1100; rf.Q.value = 0.35;
+  var rg = AC.createGain(); rg.gain.value = 0.016;
+  rsrc.connect(rf); rf.connect(rg); rg.connect(ambBus); rsrc.start();
   var lfo2 = AC.createOscillator(); lfo2.frequency.value = 0.07;
   var lg2 = AC.createGain(); lg2.gain.value = 0.018;
   lfo2.connect(lg2); lg2.connect(sg.gain); lfo2.start();
@@ -683,13 +706,13 @@ function bellTone(freq, vol, dur) {
   });
 }
 var MEL_I = 2;
-var MEL_SCALE = [220, 261.63, 293.66, 329.63, 392, 440];
+var MEL_SCALE = [110, 130.81, 146.83, 164.81, 196, 220];
 function pluckNote() {
   if (!AC || !musicBus) return;
   MEL_I = Math.max(0, Math.min(MEL_SCALE.length - 1, MEL_I + Math.floor(Math.random() * 5) - 2));
   var f = MEL_SCALE[MEL_I];
   var t0 = AC.currentTime;
-  [[1, 0.034, "triangle"], [2, 0.011, "sine"], [3, 0.004, "sine"]].forEach(function(h) {
+  [[1, 0.060, "triangle"], [2, 0.020, "sine"], [3, 0.008, "sine"]].forEach(function(h) {
     var o = AC.createOscillator(); o.type = h[2]; o.frequency.value = f * h[0];
     var g = AC.createGain();
     g.gain.setValueAtTime(0.0001, t0);
@@ -716,7 +739,7 @@ function padChord() {
         var o = AC.createOscillator(); o.type = ni === 0 ? "sine" : "triangle";
         o.frequency.value = fr; o.detune.value = det;
         var g = AC.createGain();
-        var peak = ni === 0 ? 0.016 : 0.010;
+        var peak = ni === 0 ? 0.030 : 0.020;
         g.gain.setValueAtTime(0.0001, t0);
         g.gain.exponentialRampToValueAtTime(peak, t0 + 3.2);
         g.gain.setValueAtTime(peak, t0 + dur - 3.4);
@@ -2951,8 +2974,8 @@ function hsl2rgb(h, s, l) {
 /* Vung MAT tren texture (canvas 1024; do truc tiep tu texture goc + kiem chung ve hong len render):
    trong vung nay, pixel toi -> ep den tuyen, khong cho nhanh toc/ao cham vao. */
 var EYE_RECTS = {
-  nu: [[534, 244, 551, 283], [622, 250, 647, 276]],
-  nam: [[0, 403, 43, 459], [412, 441, 460, 480]]
+  nu: [[516, 230, 568, 298], [608, 232, 660, 294]],
+  nam: [[0, 366, 90, 474], [398, 425, 474, 497]]
 };
 function buildColoredTexture(g, C) {
   var M = CHIBI_MODELS[g];
@@ -2980,8 +3003,8 @@ function buildColoredTexture(g, C) {
         if (mx === r) Hh = ((g - b) / df) % 6; else if (mx === g) Hh = (b - r) / df + 2; else Hh = (r - g) / df + 4;
         Hh *= 60; if (Hh < 0) Hh += 360;
       }
-      if (inEye && L < 0.24) {
-        d[i] = 16; d[i + 1] = 13; d[i + 2] = 13;
+      if (inEye && !(Hh >= 5 && Hh <= 38 && S >= 0.12 && S <= 0.78 && L >= 0.55 && L <= 0.93 && (r - b) > 0.08)) {
+        if (L < 0.5) { d[i] = 16; d[i + 1] = 13; d[i + 2] = 13; }
       } else if (Hh >= 5 && Hh <= 38 && S >= 0.12 && S <= 0.78 && L >= 0.55 && L <= 0.93 && (r - b) > 0.08) {
         d[i] = Math.min(255, d[i] * skf[0]); d[i + 1] = Math.min(255, d[i + 1] * skf[1]); d[i + 2] = Math.min(255, d[i + 2] * skf[2]);
       } else if (!inEye && L < 0.17 && S < 0.55 && L >= 0.065 && (r - b) < 0.105) {
@@ -3654,6 +3677,72 @@ function boxNav(d) {
   var k = occ.indexOf(currentPos);
   openDetail3D(occ[(k + d + occ.length) % occ.length]);
 }
+/* ===== CHAT CHUNG O MIEU (Firebase /chat, giu 5 ngay) ===== */
+var CHAT_KEEP_MS = 5 * 24 * 3600 * 1000;
+var chatOpen = false, chatLastSeen = 0, chatBusy = false;
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById("chatPanel").style.display = chatOpen ? "flex" : "none";
+  if (chatOpen) { chatLastSeen = Date.now(); updChatBadge(); fetchChat(true); setTimeout(function() { var i = document.getElementById("chatText"); if (i) i.focus(); }, 80); }
+}
+function updChatBadge() { var b = document.getElementById("chatBadge"); if (b) b.style.display = "none"; }
+function chatEsc(s) { return String(s == null ? "" : s).slice(0, 300); }
+function renderChat(list) {
+  var box = document.getElementById("chatMsgs");
+  if (!box) return;
+  var nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 90;
+  box.innerHTML = "";
+  if (!list.length) {
+    var e = document.createElement("div"); e.className = "cmsg"; e.style.color = "#a08b6d";
+    e.textContent = "Chưa có tin nhắn nào — bạn chào mọi người trước nhé 🌸";
+    box.appendChild(e);
+  }
+  list.forEach(function(m) {
+    var row = document.createElement("div"); row.className = "cmsg" + (m.n === myName() ? " me" : "");
+    var nm = document.createElement("span"); nm.className = "cn"; nm.textContent = m.n || "Khách";
+    var tx = document.createElement("span"); tx.textContent = " " + (m.m || "");
+    var tm = document.createElement("span"); tm.className = "ct"; tm.textContent = relTime(m.t);
+    row.appendChild(nm); row.appendChild(tx); row.appendChild(tm);
+    box.appendChild(row);
+  });
+  if (chatOpen && nearBottom) box.scrollTop = box.scrollHeight;
+}
+function fetchChat(scroll) {
+  if (!DB_URL || chatBusy) return;
+  chatBusy = true;
+  dbGet("/chat").then(function(data) {
+    chatBusy = false;
+    if (!data) { if (chatOpen) renderChat([]); return; }
+    var now = Date.now(), list = [], stale = [];
+    Object.keys(data).forEach(function(k) {
+      var m = data[k];
+      if (!m || !m.t) return;
+      if (now - m.t > CHAT_KEEP_MS) stale.push(k);
+      else list.push({ n: chatEsc(m.n), m: chatEsc(m.m), t: m.t });
+    });
+    list.sort(function(a, b) { return a.t - b.t; });
+    if (list.length > 200) list = list.slice(list.length - 200);
+    stale.slice(0, 6).forEach(function(k) { dbDel("/chat/" + k); });
+    var newest = list.length ? list[list.length - 1].t : 0;
+    if (!chatOpen && newest > chatLastSeen && chatLastSeen > 0) {
+      var b = document.getElementById("chatBadge");
+      if (b) { b.style.display = "inline-block"; b.textContent = "mới"; }
+    }
+    if (chatOpen) { renderChat(list); if (scroll) { var bx = document.getElementById("chatMsgs"); if (bx) bx.scrollTop = bx.scrollHeight; } }
+  }).catch(function() { chatBusy = false; });
+}
+function sendChat() {
+  var inp = document.getElementById("chatText");
+  var txt = (inp.value || "").trim();
+  if (!txt || !DB_URL) return;
+  inp.value = "";
+  dbPost("/chat", { n: myName(), m: txt.slice(0, 300), t: Date.now() }).then(function() { chatLastSeen = Date.now(); fetchChat(true); }).catch(function() {});
+}
+setInterval(fetchChat, 5000);
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && document.activeElement && document.activeElement.id === "chatText") sendChat();
+});
+
 function myName() { return (U.profile && U.profile.name) || "Trăng Lặng"; }
 function logVisit(type, toyId) {
   var sh = U.shrines[currentPos]; if (!sh) return;
@@ -3973,7 +4062,7 @@ function applySettingsFx() {
   var st = settings();
   if (renderer) renderer.setPixelRatio(st.gfx === "low" ? 1 : Math.min(window.devicePixelRatio || 1, 1.5));
   FX_ON = st.fx;
-  if (musicBus) musicBus.gain.value = st.music ? 0.32 : 0;
+  if (musicBus) musicBus.gain.value = st.music ? 0.5 : 0;
   if (sfxBus) sfxBus.gain.value = st.sfx ? 0.85 : 0;
   if (ambBus) ambBus.gain.value = st.sfx ? 0.9 : 0;
 }
