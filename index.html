@@ -56,8 +56,8 @@ if (window.GM_GAME_ID && window.GM_GAME_ID.length >= 20) {
   #chatPop { position: absolute; right: 12px; bottom: 224px; z-index: 6; max-width: 250px; background: rgba(253,246,236,.96); color: #43301b; border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.4); padding: 9px 13px; font-size: 13.5px; line-height: 1.4; display: none; cursor: pointer; }
   #chatPop .cn { font-weight: 700; color: #a8402f; }
   #chatPanel { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; width: min(520px, 100%); max-height: 62vh; background: #fdf6ec; border-radius: 18px 18px 0 0; box-shadow: 0 -12px 40px rgba(0,0,0,.45); z-index: 60; display: none; flex-direction: column; font-family: inherit; color: #43301b; }
-  #chatPanel .cp-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 8px; font-family: Georgia, serif; font-weight: 700; font-size: 16.5px; }
-  #chatPanel .cp-head button { border: none; background: #efe0c8; border-radius: 999px; width: 30px; height: 30px; cursor: pointer; font-size: 14px; }
+  #chatPanel .cp-head, #floorPanel .cp-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 8px; font-family: Georgia, serif; font-weight: 700; font-size: 16.5px; }
+  #chatPanel .cp-head button, #floorPanel .cp-head button { border: none; background: #efe0c8; border-radius: 999px; width: 30px; height: 30px; cursor: pointer; font-size: 14px; }
   #chatMsgs { overflow-y: auto; padding: 4px 16px 10px; flex: 1; min-height: 120px; }
   .cmsg { margin: 7px 0; font-size: 14px; line-height: 1.45; }
   .cmsg .cn { font-weight: 700; color: #a8402f; }
@@ -66,6 +66,10 @@ if (window.GM_GAME_ID && window.GM_GAME_ID.length >= 20) {
   #chatPanel .cp-input { display: flex; gap: 8px; padding: 10px 12px 14px; border-top: 1px solid #eadfc8; }
   #chatText { flex: 1; border: 1.5px solid #d9c8a3; border-radius: 999px; padding: 9px 14px; font-size: 14.5px; font-family: inherit; background: #fff; color: #43301b; }
   #chatSend { border: none; background: #a8402f; color: #ffe9bb; font-weight: 700; border-radius: 999px; padding: 9px 18px; cursor: pointer; font-family: inherit; }
+  #floorPanel { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; width: min(520px, 100%); background: #fdf6ec; border-radius: 18px 18px 0 0; box-shadow: 0 -12px 40px rgba(0,0,0,.45); z-index: 60; display: none; flex-direction: column; font-family: inherit; color: #43301b; padding-bottom: 14px; }
+  #floorList { padding: 6px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .floorRow { border: 1.5px solid #d9c8a3; background: #fff; border-radius: 12px; padding: 12px 14px; font-family: inherit; font-size: 15px; font-weight: 700; color: #43301b; cursor: pointer; text-align: left; }
+  .floorRow.cur { background: #a8402f; color: #ffe9bb; border-color: #a8402f; }
   #settingsPanel { position: absolute; inset: 0; background: rgba(20,12,6,.55); display: none; align-items: center; justify-content: center; z-index: 47; }
   .setrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px dashed #d9c39a; font-size: 14.5px; }
   .setbtn { border: 1.5px solid #a97e4f; background: #fff7e8; color: #6d4c26; border-radius: 999px; padding: 5px 14px; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 13px; }
@@ -239,6 +243,7 @@ if (window.GM_GAME_ID && window.GM_GAME_ID.length >= 20) {
     <button class="pill add" onclick="addMine3D()">＋ <span data-i18n="addMine">Thêm bé của tôi</span></button>
     <button class="pill" onclick="openCreator()">👤 <span data-i18n="creator">Tạo hình</span></button>
     <button class="pill" onclick="openSettings()">⚙️ <span data-i18n="settings">Cài đặt</span></button>
+    <button class="pill" id="floorBtn" onclick="openFloors()">🛗 Tầng 1</button>
   </div>
   <div class="feedbar" id="feed"></div>
   <div class="hintbar">🖱️ Kéo chuột/ngón tay để xoay camera · WASD hoặc phím mũi tên để đi · Bấm vào một ô trên vách để thăm / đặt chỗ</div>
@@ -395,6 +400,10 @@ if (window.GM_GAME_ID && window.GM_GAME_ID.length >= 20) {
   <button id="speedBtn" onclick="cycleSpeed()">🚶 x1</button>
   <button id="chatBtn" onclick="toggleChat()">💬 Chat<span id="chatBadge"></span></button>
   <div id="chatPop" onclick="toggleChat()"></div>
+  <div id="floorPanel">
+    <div class="cp-head"><span>🛗 Thang máy — chọn tầng</span><button onclick="closeFloors()">✕</button></div>
+    <div id="floorList"></div>
+  </div>
   <div id="chatPanel">
     <div class="cp-head"><span>💬 Trò chuyện ở miếu</span><button onclick="toggleChat()">✕</button></div>
     <div id="chatMsgs"></div>
@@ -427,7 +436,7 @@ function loadState() {
 function saveState() { try { localStorage.setItem(STORE_KEY, JSON.stringify(U)); } catch (e) {} }
 function esc(t) { return String(t == null ? "" : t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function todayStr() { var d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
-function posLabel(i) { if (i >= 64) { var np = i - 63; return "P-" + (np < 10 ? "0" : "") + np; } var n = i >= 32 ? i - 31 : i + 1; return (i >= 32 ? "B-" : "A-") + (n < 10 ? "0" : "") + n; }
+function posLabel(i) { var fl = Math.floor(i / PER_FLOOR), lc = i % PER_FLOOR, n = (lc % 16) + 1; return "T" + (fl + 1) + "·" + (lc >= 16 ? "B-" : "A-") + (n < 10 ? "0" : "") + n; }
 function toast(msg) {
   var t = document.getElementById("toast");
   t.textContent = msg;
@@ -574,7 +583,7 @@ function tagTexture(text) {
 
 <script>
 /* ================= KHOI TAO 3D ================= */
-var COLS = 8, ROWS = 4, NCELLS = 64;
+var COLS = 8, ROWS = 2, NCELLS = 128, PER_FLOOR = 32, FLOORS = 4, FLOOR = 0;
 var scene, camera, renderer, clock;
 var cells = [];        // {group, hit, photoMesh, plaqueMesh, glow, candleG, incenseG, flowerS, giftM, flame}
 var hitMeshes = [];
@@ -2541,20 +2550,16 @@ function buildBuddha() {
 }
 
 /* ================= VACH O THO ================= */
-var CELL_W = 2.06, CELL_H = 1.96, WALL_Z = -6.35;
+var CELL_W = 2.06, CELL_H = 1.8, WALL_Z = -6.35, WALL_CY = 2.3;
 function cellCenter(i) {
-  if (i >= 64) {
-    var pj = i - 64, pcol = pj % 8, prow = Math.floor(pj / 8);
-    return { x: 19.2, y: 2.45 + (1.5 - prow) * 1.215, z: 15.5 + (pcol - 3.5) * 1.277, ry: -Math.PI / 2 };
-  }
-  var south = i >= 32;
-  var j = south ? i - 32 : i;
-  var bank = j < 16 ? 0 : 1;
-  var k = bank ? j - 16 : j;
+  var south = i >= 16;
+  var j = south ? i - 16 : i;
+  var bank = j < 8 ? 0 : 1;
+  var k = bank ? j - 8 : j;
   var col = k % 4, row = Math.floor(k / 4);
   return {
     x: (bank ? 6.6 : -6.6) + (col - 1.5) * CELL_W,
-    y: 4.15 + ((ROWS - 1) / 2 - row) * CELL_H,
+    y: WALL_CY + ((ROWS - 1) / 2 - row) * CELL_H,
     z: south ? 8.5 : WALL_Z,
     ry: south ? Math.PI : 0
   };
@@ -2564,24 +2569,24 @@ function buildWall() {
   var cabW = 4 * CELL_W + 0.7, cabH = ROWS * CELL_H + 0.9;
   [-6.6, 6.6].forEach(function(bx) {
     var cab = new THREE.Mesh(new THREE.BoxGeometry(cabW, cabH, 0.95), woodMat);
-    cab.position.set(bx, 4.15, WALL_Z - 0.45);
+    cab.position.set(bx, WALL_CY, WALL_Z - 0.45);
     scene.add(cab);
     var topBar = new THREE.Mesh(new THREE.BoxGeometry(cabW + 0.4, 0.34, 1.15), woodMat);
-    topBar.position.set(bx, 4.15 + cabH / 2 + 0.15, WALL_Z - 0.45);
+    topBar.position.set(bx, WALL_CY + cabH / 2 + 0.15, WALL_Z - 0.45);
     scene.add(topBar);
     var botBar = new THREE.Mesh(new THREE.BoxGeometry(cabW + 0.5, 0.42, 1.15), woodMat);
-    botBar.position.set(bx, 4.15 - cabH / 2 - 0.18, WALL_Z - 0.45);
+    botBar.position.set(bx, WALL_CY - cabH / 2 - 0.18, WALL_Z - 0.45);
     scene.add(botBar);
   });
   [-6.6, 6.6].forEach(function(bx) {
     var cab2 = new THREE.Mesh(new THREE.BoxGeometry(cabW, cabH, 0.6), woodMat);
-    cab2.position.set(bx, 4.15, 8.8);
+    cab2.position.set(bx, WALL_CY, 8.8);
     scene.add(cab2);
     var topBar2 = new THREE.Mesh(new THREE.BoxGeometry(cabW + 0.4, 0.34, 0.7), woodMat);
-    topBar2.position.set(bx, 4.15 + cabH / 2 + 0.15, 8.8);
+    topBar2.position.set(bx, WALL_CY + cabH / 2 + 0.15, 8.8);
     scene.add(topBar2);
     var botBar2 = new THREE.Mesh(new THREE.BoxGeometry(cabW + 0.5, 0.42, 0.7), woodMat);
-    botBar2.position.set(bx, 4.15 - cabH / 2 - 0.18, 8.8);
+    botBar2.position.set(bx, WALL_CY - cabH / 2 - 0.18, 8.8);
     scene.add(botBar2);
   });
 
@@ -2590,12 +2595,11 @@ function buildWall() {
   var glassMat = new THREE.MeshBasicMaterial({ color: 0xfff4d6, transparent: true, opacity: 0.06, depthWrite: false });
   var hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
 
-  for (var i = 0; i < NCELLS; i++) {
+  for (var i = 0; i < PER_FLOOR; i++) {
     var c = cellCenter(i);
     var grp = new THREE.Group();
     grp.position.set(c.x, c.y, c.z);
     if (c.ry) grp.rotation.y = c.ry;
-    if (i >= 64) grp.scale.setScalar(0.62);
     scene.add(grp);
 
     var cavity = new THREE.Mesh(
@@ -2745,8 +2749,10 @@ function buildPetZone() {
 }
 
 function refreshCell(i) {
+  var local = i - FLOOR * PER_FLOOR;
+  if (local < 0 || local >= PER_FLOOR) return;
   var sh = U.shrines[i];
-  var C = cells[i];
+  var C = cells[local];
   if (!C) return;
   if (!sh) {
     C.photo.material.map = null; C.photo.material.opacity = 0; C.photo.material.needsUpdate = true;
@@ -3232,19 +3238,15 @@ function tapAt(e) {
       if (sdx * sdx + sdz * sdz > 10.2) return;
       if (sitSpot.type === "kneel") kneelOn(sitSpot); else sitOn(sitSpot); return;
     }
-    var idx = hits[0].object.userData.cell;
-    if (idx === undefined || !cells[idx]) return;
-    var cg = cells[idx].grp.position;
+    var local = hits[0].object.userData.cell;
+    if (local === undefined || !cells[local]) return;
+    var cg = cells[local].grp.position;
     var cdx = avatar.position.x - cg.x, cdz = avatar.position.z - cg.z;
-    if (idx >= 64) {
-      if (cdx * cdx + cdz * cdz > 12) return;
-      if (avatar.position.x < 15) return;
-    } else {
-      var lim = idx >= 32 ? 10.2 : 18.5;
-      if (cdx * cdx + cdz * cdz > lim) return;
-      if (idx >= 32 && avatar.position.z > 8.6) return;
-      if (idx < 32 && avatar.position.z < -6.2) return;
-    }
+    var lim = local >= 16 ? 10.2 : 18.5;
+    if (cdx * cdx + cdz * cdz > lim) return;
+    if (local >= 16 && avatar.position.z > 8.6) return;
+    if (local < 16 && avatar.position.z < -6.2) return;
+    var idx = FLOOR * PER_FLOOR + local;
     if (U.shrines[idx]) openDetail3D(idx); else openAdd3D(idx);
   }
 }
@@ -3449,13 +3451,18 @@ function animate() {
 var addPos = null, pendingPhoto = null, selectedKind = "dog", currentPos = null, removeArmed = false;
 var PICK_DEFAULT = '<span class="big">📷</span><span>Thêm ảnh</span>';
 function addMine3D() {
-  for (var i = 0; i < NCELLS; i++) if (!U.shrines[i]) { openAdd3D(i); return; }
-  toast("Dãy A đã đầy — sắp mở thêm Dãy B nhé");
+  for (var i = 0; i < NCELLS; i++) if (!U.shrines[i]) {
+    var fl = Math.floor(i / PER_FLOOR);
+    if (fl !== FLOOR) { goFloor(fl, function() { openAdd3D(i); }); }
+    else openAdd3D(i);
+    return;
+  }
+  toast("Cả 4 tầng đã đầy rồi bạn ơi 🥹");
 }
 function openAdd3D(idx) {
   addPos = idx; pendingPhoto = null;
   document.getElementById("addPosLabel").textContent = posLabel(idx);
-  document.getElementById("addZoneLabel").textContent = idx >= 64 ? "Khu Thú Cưng" : (idx >= 32 ? "Dãy B" : "Dãy A");
+  document.getElementById("addZoneLabel").textContent = "Tầng " + (Math.floor(idx / PER_FLOOR) + 1) + " · " + (idx % PER_FLOOR >= 16 ? "Dãy B" : "Dãy A");
   document.getElementById("photoPick").innerHTML = PICK_DEFAULT;
   document.getElementById("photoInput").value = "";
   ["newName", "newYears", "newSpecialDay", "newMsg", "newEmail"].forEach(function(id) { document.getElementById(id).value = ""; });
@@ -3681,6 +3688,38 @@ function boxNav(d) {
   var k = occ.indexOf(currentPos);
   openDetail3D(occ[(k + d + occ.length) % occ.length]);
 }
+/* ===== THANG MAY: 4 TANG AO, MOI TANG 32 O (2 hang thap) ===== */
+function floorCounts() { var c = [0, 0, 0, 0]; Object.keys(U.shrines).forEach(function(k) { var f = Math.floor((+k) / PER_FLOOR); if (f >= 0 && f < FLOORS) c[f]++; }); return c; }
+function openFloors() {
+  var list = document.getElementById("floorList"); list.innerHTML = "";
+  var counts = floorCounts();
+  for (var f = 0; f < FLOORS; f++) {
+    (function(f) {
+      var b = document.createElement("button"); b.className = "floorRow" + (f === FLOOR ? " cur" : "");
+      b.textContent = "Tầng " + (f + 1) + " — " + counts[f] + "/" + PER_FLOOR + " ô đã có bé" + (f === FLOOR ? " · bạn đang ở đây" : "");
+      b.onclick = function() { goFloor(f); };
+      list.appendChild(b);
+    })(f);
+  }
+  document.getElementById("floorPanel").style.display = "flex";
+}
+function closeFloors() { document.getElementById("floorPanel").style.display = "none"; }
+function goFloor(f, after) {
+  closeFloors();
+  if (f === FLOOR) { if (after) after(); return; }
+  var fs = document.getElementById("fadeScreen");
+  fs.style.opacity = "1"; fs.style.pointerEvents = "all";
+  setTimeout(function() {
+    FLOOR = f;
+    for (var li = 0; li < PER_FLOOR; li++) refreshCell(FLOOR * PER_FLOOR + li);
+    var fb = document.getElementById("floorBtn"); if (fb) fb.textContent = "🛗 Tầng " + (f + 1);
+    lastPresenceSent = 0; sendPresence();
+    toast("🛗 Đã tới Tầng " + (f + 1));
+    fs.style.opacity = "0"; fs.style.pointerEvents = "none";
+    if (after) after();
+  }, 330);
+}
+
 /* ===== CHAT CHUNG O MIEU (Firebase /chat, giu 5 ngay) ===== */
 var CHAT_KEEP_MS = 5 * 24 * 3600 * 1000;
 var chatOpen = false, chatLastSeen = 0, chatBusy = false, chatCache = [], chatLastT = 0, chatPopTimer = null;
@@ -4295,7 +4334,7 @@ function sendPresence() {
   if (!moved && now - lastPresenceSent < 12000) return;
   lastPresenceSent = now; lastSentPos = { x: p.x, z: p.z, r: r };
   window.__lastSeatSent = seatId;
-  dbPut("/presence/" + CLIENT_ID, { n: myName(), g: myGender(), x: +p.x.toFixed(2), z: +p.z.toFixed(2), r: +r.toFixed(2), c: myColors(), s: seatId, t: now });
+  dbPut("/presence/" + CLIENT_ID, { n: myName(), g: myGender(), x: +p.x.toFixed(2), z: +p.z.toFixed(2), r: +r.toFixed(2), c: myColors(), s: seatId, f: FLOOR, t: now });
 }
 function makeOtherAvatar(name, c, g) {
   var grp = new THREE.Group();
@@ -4323,6 +4362,7 @@ function pollPresence() {
         var e = d[id];
         if (!e || !e.t || now - e.t > 45000) return;
         fresh++;
+        if ((e.f || 0) !== FLOOR) return;
         if (id === CLIENT_ID) return;
         alive[id] = true;
         var o = others[id];
