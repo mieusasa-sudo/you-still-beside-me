@@ -459,7 +459,14 @@ function loadState() {
 function saveState() { try { localStorage.setItem(STORE_KEY, JSON.stringify(U)); } catch (e) {} }
 function esc(t) { return String(t == null ? "" : t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 function todayStr() { var d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
-function posLabel(i) { var fl = Math.floor(i / PER_FLOOR), lc = i % PER_FLOOR, n = (lc % 24) + 1; return "T" + (fl + 1) + "·" + (lc >= 24 ? "B-" : "A-") + (n < 10 ? "0" : "") + n; }
+function posLabel(i) {
+  var fl = Math.floor(i / PER_FLOOR), lc = i % PER_FLOOR, day, n;
+  if (lc < 24) { day = "A"; n = lc + 1; }
+  else if (lc < 48) { day = "B"; n = lc - 23; }
+  else if (lc < 60) { day = "C"; n = lc - 47; }
+  else { day = "D"; n = lc - 59; }
+  return "T" + (fl + 1) + "·" + day + "-" + (n < 10 ? "0" : "") + n;
+}
 function toast(msg) {
   var t = document.getElementById("toast");
   t.textContent = msg;
@@ -606,7 +613,7 @@ function tagTexture(text) {
 
 <script>
 /* ================= KHOI TAO 3D ================= */
-var COLS = 8, ROWS = 3, NCELLS = 192, PER_FLOOR = 48, FLOORS = 4, FLOOR = 0;
+var COLS = 8, ROWS = 3, NCELLS = 288, PER_FLOOR = 72, FLOORS = 4, FLOOR = 0;
 var scene, camera, renderer, clock;
 var cells = [];        // {group, hit, photoMesh, plaqueMesh, glow, candleG, incenseG, flowerS, giftM, flame}
 var hitMeshes = [];
@@ -1223,11 +1230,7 @@ function makeCandleStand(x, z) {
   return g;
 }
 function buildDecor() {
-  /* chau truc doc hai tuong ben + goc cua */
-  scene.add(makeBamboo(-10.35, -1.5, 1.05));
-  scene.add(makeBamboo(10.35, -1.5, 0.95));
-  scene.add(makeBamboo(-10.35, 3.8, 0.9));
-  scene.add(makeBamboo(10.35, 3.8, 1.1));
+  /* (da xoa het chau truc hai tuong ben — thay bang ke di anh day C/D theo y Nhien) */
   /* (da xoa chau truc 2 goc cua theo y Nhien) */
   /* den long: hai day doc loi di + cap truoc vach */
   var lz = [-4.2, -0.6, 3.0];
@@ -2608,6 +2611,16 @@ function buildBuddha() {
 /* ================= VACH O THO ================= */
 var CELL_W = 2.06, CELL_H = 1.8, WALL_Z = -6.35, WALL_CY = 2.75;
 function cellCenter(i) {
+  if (i >= 48) {
+    var side = i - 48, east = side >= 12, kk = east ? side - 12 : side;
+    var ccol = kk % 4, crow = Math.floor(kk / 4);
+    return {
+      x: east ? 10.45 : -10.45,
+      y: WALL_CY + ((ROWS - 1) / 2 - crow) * CELL_H,
+      z: 1.15 + (ccol - 1.5) * CELL_W,
+      ry: east ? -Math.PI / 2 : Math.PI / 2
+    };
+  }
   var south = i >= 24;
   var j = south ? i - 24 : i;
   var bank = j < 12 ? 0 : 1;
@@ -2644,6 +2657,18 @@ function buildWall() {
     var botBar2 = new THREE.Mesh(new THREE.BoxGeometry(cabW + 0.5, 0.42, 0.7), woodMat);
     botBar2.position.set(bx, WALL_CY - cabH / 2 - 0.18, 8.8);
     scene.add(botBar2);
+  });
+
+  [-10.75, 10.75].forEach(function(wx) {
+    var cabS = new THREE.Mesh(new THREE.BoxGeometry(0.6, cabH, cabW), woodMat);
+    cabS.position.set(wx, WALL_CY, 1.15);
+    scene.add(cabS);
+    var topS = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.34, cabW + 0.4), woodMat);
+    topS.position.set(wx, WALL_CY + cabH / 2 + 0.15, 1.15);
+    scene.add(topS);
+    var botS = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.42, cabW + 0.5), woodMat);
+    botS.position.set(wx, WALL_CY - cabH / 2 - 0.18, 1.15);
+    scene.add(botS);
   });
 
   var pawTex = pawTexture();
@@ -3321,8 +3346,10 @@ function tapAt(e) {
     var cdx = avatar.position.x - cg.x, cdz = avatar.position.z - cg.z;
     var lim = local >= 24 ? 10.2 : 18.5;
     if (cdx * cdx + cdz * cdz > lim) return;
-    if (local >= 24 && avatar.position.z > 8.6) return;
+    if (local >= 24 && local < 48 && avatar.position.z > 8.6) return;
     if (local < 24 && avatar.position.z < -6.2) return;
+    if (local >= 48 && local < 60 && avatar.position.x < -10.2) return;
+    if (local >= 60 && avatar.position.x > 10.2) return;
     var idx = FLOOR * PER_FLOOR + local;
     if (U.shrines[idx]) openDetail3D(idx); else openAdd3D(idx);
   }
@@ -3539,7 +3566,7 @@ function addMine3D() {
 function openAdd3D(idx) {
   addPos = idx; pendingPhoto = null;
   document.getElementById("addPosLabel").textContent = posLabel(idx);
-  document.getElementById("addZoneLabel").textContent = "Tầng " + (Math.floor(idx / PER_FLOOR) + 1) + " · " + (idx % PER_FLOOR >= 24 ? "Dãy B" : "Dãy A");
+  var _lc = idx % PER_FLOOR; document.getElementById("addZoneLabel").textContent = "Tầng " + (Math.floor(idx / PER_FLOOR) + 1) + " · Dãy " + (_lc < 24 ? "A" : _lc < 48 ? "B" : _lc < 60 ? "C" : "D");
   document.getElementById("photoPick").innerHTML = PICK_DEFAULT;
   document.getElementById("photoInput").value = "";
   ["newName", "newYears", "newSpecialDay", "newMsg", "newEmail"].forEach(function(id) { document.getElementById(id).value = ""; });
