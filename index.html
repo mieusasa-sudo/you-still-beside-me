@@ -215,10 +215,10 @@ if (window.GM_GAME_ID && window.GM_GAME_ID.length >= 20) {
 <div id="loadScreen">
   <div class="ld-candle">🕯️</div>
   <div class="ld-title">You Still Beside Me</div>
-  <div class="ld-tag" id="loadTag">Một góc bình yên, để nhớ về những dấu yêu, vẫn luôn ở đó bên cạnh ta mãi mãi.</div>
+  <div class="ld-tag" id="loadTag">A peaceful corner to remember our beloved — always there, beside us, forever.</div>
   <div class="ld-bar"><div class="ld-fill" id="loadFill"></div></div>
-  <div class="ld-pct" id="loadPct">Đang mở cửa miếu…</div>
-  <div class="ld-sub">Miếu tưởng niệm online · thắp nến, dâng hoa cho những người thương đã đi xa</div>
+  <div class="ld-pct" id="loadPct">Opening the temple…</div>
+  <div class="ld-sub">An online memorial temple — light a candle, offer flowers for the beloved ones who have gone ahead</div>
 </div>
 <style>
 #loadScreen { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; background: linear-gradient(180deg, #fdf3e3 0%, #fdeef2 55%, #f9dce8 100%); transition: opacity 0.7s ease; }
@@ -411,7 +411,7 @@ if (window.GM_GAME_ID && window.GM_GAME_ID.length >= 20) {
   </div>
   <div class="toast" id="toast"></div>
   <div id="fxFloat"></div>
-  <div id="boot"><div class="big">🕯️</div><p id="bootMsg">Đang dựng miếu…<br>Nếu đợi lâu quá, kiểm tra mạng rồi tải lại trang nhé.</p></div>
+  <div id="boot"><div class="big">🕯️</div><p id="bootMsg">Building the temple…<br>If it takes too long, please check your connection and reload the page.</p></div>
 </div>
 
 <script>
@@ -2877,7 +2877,7 @@ function setLoadProgress(pct, msg) {
 function finishLoading() {
   if (window.__loadDone) return;
   window.__loadDone = true;
-  setLoadProgress(100, "Sẵn sàng rồi 🌸");
+  setLoadProgress(100, "Ready 🌸");
   var e = document.getElementById("loadScreen");
   if (e) { setTimeout(function() { e.classList.add("done"); setTimeout(function() { e.style.display = "none"; }, 750); }, 250); }
 }
@@ -2890,7 +2890,7 @@ function loadChibiModel(g) {
     if (i >= M.chunks.length) { decodeChibi(g); return; }
     var sc = document.createElement("script");
     sc.src = M.chunks[i]; i++;
-    sc.onload = function() { setLoadProgress(5 + Math.round(i / M.chunks.length * 70), "Đang tải nhân vật… " + Math.round(i / M.chunks.length * 100) + "%"); next(); };
+    sc.onload = function() { setLoadProgress(5 + Math.round(i / M.chunks.length * 70), "Loading character… " + Math.round(i / M.chunks.length * 100) + "%"); next(); };
     sc.onerror = function() { M.loading = false; retryChibi(g); };
     document.head.appendChild(sc);
   }
@@ -2898,7 +2898,7 @@ function loadChibiModel(g) {
 }
 function decodeChibi(g) {
   var M = CHIBI_MODELS[g];
-  setLoadProgress(85, "Đang dựng nhân vật…");
+  setLoadProgress(85, "Building your character…");
   try {
     var b64 = "";
     for (var k = 1; k <= M.chunks.length; k++) b64 += window[M.prefix + k] || "";
@@ -4212,7 +4212,7 @@ tickFeed();
 setInterval(tickFeed, 8000);
 /* so nguoi: chi dem nguoi that qua pollPresence (khong dung so gia) */
 if (typeof THREE === "undefined") {
-  document.getElementById("bootMsg").innerHTML = "Không tải được thư viện 3D (THREE.js).<br>Kiểm tra kết nối mạng rồi tải lại trang nhé.";
+  document.getElementById("bootMsg").innerHTML = "Could not load the 3D library (THREE.js).<br>Please check your connection and reload the page.";
 } else {
   init3D();
   window.addEventListener("pointerdown", function() { audioInit(); });
