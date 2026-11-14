@@ -2944,8 +2944,8 @@ function decodeChibi(g) {
       var actions = {};
       gltf.animations.forEach(function(clip) {
         var canon = null;
-        Object.keys(M.clips).forEach(function(k) { if (M.clips[k] === clip.name) canon = k; });
-        if (!canon) return;
+        Object.keys(M.clips).forEach(function(k) { if (M.clips[k] === clip.name && !canon) canon = k; });
+        if (!canon || actions[canon]) return;
         var a = mixer.clipAction(clip);
         if (canon === "sit" || canon === "stand" || canon === "kneel" || canon === "unkneel") { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; }
         actions[canon] = a;
@@ -3129,8 +3129,8 @@ function spawnRemoteChibi(id, e) {
       var actions = {};
       gltf.animations.forEach(function(clip) {
         var canon = null;
-        Object.keys(M.clips).forEach(function(k) { if (M.clips[k] === clip.name) canon = k; });
-        if (!canon) return;
+        Object.keys(M.clips).forEach(function(k) { if (M.clips[k] === clip.name && !canon) canon = k; });
+        if (!canon || actions[canon]) return;
         var a = mixer.clipAction(clip);
         if (canon === "sit" || canon === "stand" || canon === "kneel" || canon === "unkneel") { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; }
         actions[canon] = a;
