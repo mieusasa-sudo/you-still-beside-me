@@ -18,9 +18,22 @@ window.SDK_OPTIONS = {
     else if (a.name === "SDK_GAME_START") { if (window.__gmOnStart) window.__gmOnStart(); }
   }
 };
-if (window.GM_GAME_ID && window.GM_GAME_ID.length >= 20) {
-  (function (d, b, c) { var t = d.getElementsByTagName(b)[0]; if (!d.getElementById(c)) { var s = d.createElement(b); s.id = c; s.src = "https://api.gamemonetize.com/sdk.js"; t.parentNode.insertBefore(s, t); } })(document, "script", "gamemonetize-sdk");
-}
+/* SDK chi tai THEO YEU CAU (khi nguoi choi bam xem quang cao nhan vat pham) — khong tai san luc vao game de tranh quang cao tu hien (preroll) */
+window.__gmSdkState = 0;
+window.__gmLoadSdk = function (cb) {
+  if (typeof sdk !== "undefined" && sdk && typeof sdk.showBanner === "function") { cb(true); return; }
+  if (window.__gmSdkState === 2) { cb(false); return; }
+  window.__gmSdkCbs = window.__gmSdkCbs || [];
+  window.__gmSdkCbs.push(cb);
+  if (window.__gmSdkState === 1) return;
+  window.__gmSdkState = 1;
+  var s = document.createElement("script");
+  s.id = "gamemonetize-sdk";
+  s.src = "https://api.gamemonetize.com/sdk.js";
+  s.onload = function() { window.__gmSdkState = 2; var ok = (typeof sdk !== "undefined" && sdk && typeof sdk.showBanner === "function"); (window.__gmSdkCbs || []).forEach(function(f) { f(ok); }); window.__gmSdkCbs = []; };
+  s.onerror = function() { window.__gmSdkState = 2; (window.__gmSdkCbs || []).forEach(function(f) { f(false); }); window.__gmSdkCbs = []; };
+  var t = document.getElementsByTagName("script")[0]; t.parentNode.insertBefore(s, t);
+};
 </script>
 <script src="three.min.js"></script>
 <script src="gltf-loader.js"></script>
@@ -710,10 +723,9 @@ function ambStart() {
   var lfo2 = AC.createOscillator(); lfo2.frequency.value = 0.07;
   var lg2 = AC.createGain(); lg2.gain.value = 0.018;
   lfo2.connect(lg2); lg2.connect(sg.gain); lfo2.start();
-  setTimeout(ambCricket, 1200);
-  setTimeout(ambFrog, 3500);
+  /* Da bo tieng de va ech (Nhien yeu cau 14/11) — chi giu suoi + mua */
 }
-function ambCricket() {
+function ambCricket() { return;
   if (!AC || !ambBus) return;
   if (settings().sfx) {
     var t = AC.currentTime + 0.05, o = AC.createOscillator(), g = AC.createGain();
@@ -729,7 +741,7 @@ function ambCricket() {
   }
   setTimeout(ambCricket, 1500 + Math.random() * 3500);
 }
-function ambFrog() {
+function ambFrog() { return;
   if (!AC || !ambBus) return;
   if (settings().sfx) {
     var t = AC.currentTime + 0.05;
@@ -4084,19 +4096,24 @@ function watchAd(pending) {
   document.getElementById("adDone").style.display = "none";
   var fill = document.getElementById("adFill"), cnt = document.getElementById("adCount");
   clearInterval(adInt); clearTimeout(adSdkT); clearTimeout(adChkT);
-  if (typeof sdk !== "undefined" && sdk && typeof sdk.showBanner === "function" && window.GM_GAME_ID) {
-    /* QUANG CAO THAT (GameMonetize): phat video -> SDK_GAME_START -> cho nhan thuong */
-    fill.style.width = "100%"; cnt.textContent = "Đang phát quảng cáo…";
-    var adStarted = false;
-    window.__gmOnPause = function() { adStarted = true; audioPauseForAd(true); };
-    window.__gmOnStart = function() {
-      audioPauseForAd(false); clearTimeout(adSdkT); clearTimeout(adChkT);
-      cnt.textContent = "Đã xem xong!";
-      document.getElementById("adDone").style.display = "";
-    };
-    adSdkT = setTimeout(function() { if (window.__gmOnStart) window.__gmOnStart(); }, 90000);
-    adChkT = setTimeout(function() { if (!adStarted) { clearTimeout(adSdkT); mockAd(fill, cnt); } }, 7000);
-    try { sdk.showBanner(); } catch (e) { clearTimeout(adSdkT); clearTimeout(adChkT); mockAd(fill, cnt); }
+  if (window.GM_GAME_ID && window.GM_GAME_ID.length >= 20) {
+    /* QUANG CAO THAT (GameMonetize): chi chay khi nguoi choi bam xem quang cao de nhan vat pham */
+    fill.style.width = "100%"; cnt.textContent = "Đang tải quảng cáo…";
+    window.__gmLoadSdk(function(ok) {
+      if (!adPending) return;
+      if (!ok) { mockAd(fill, cnt); return; }
+      cnt.textContent = "Đang phát quảng cáo…";
+      var adStarted = false;
+      window.__gmOnPause = function() { adStarted = true; audioPauseForAd(true); };
+      window.__gmOnStart = function() {
+        audioPauseForAd(false); clearTimeout(adSdkT); clearTimeout(adChkT);
+        cnt.textContent = "Đã xem xong!";
+        document.getElementById("adDone").style.display = "";
+      };
+      adSdkT = setTimeout(function() { if (window.__gmOnStart) window.__gmOnStart(); }, 90000);
+      adChkT = setTimeout(function() { if (!adStarted) { clearTimeout(adSdkT); mockAd(fill, cnt); } }, 7000);
+      try { sdk.showBanner(); } catch (e) { clearTimeout(adSdkT); clearTimeout(adChkT); mockAd(fill, cnt); }
+    });
     return;
   }
   mockAd(fill, cnt);
