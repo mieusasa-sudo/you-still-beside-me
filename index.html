@@ -3134,10 +3134,11 @@ function updateChibiAnim(dt, moving) {
   else if (CHIBI.actT > 0 && CHIBI.actAnim) want = CHIBI.actAnim;
   else {
     CHIBI.idleT += dt;
+    if (myGender() === "nu") CHIBI.angryT = 0; /* Nhan vat nu: chi giu 1 tu the dung im */
     if (CHIBI.angryT > 0) { CHIBI.angryT -= dt; want = "idle2"; if (CHIBI.angryT <= 0) CHIBI.idleT = 0; }
     else {
       want = "idle";
-      if (CHIBI.idleT > 10 + CHIBI.idleSeed) { CHIBI.angryT = 5; CHIBI.idleSeed = Math.random() * 9; }
+      if (myGender() !== "nu" && CHIBI.idleT > 10 + CHIBI.idleSeed) { CHIBI.angryT = 5; CHIBI.idleSeed = Math.random() * 9; }
     }
   }
   if (want) setChibiAnim(want);
