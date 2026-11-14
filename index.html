@@ -641,6 +641,38 @@ function init3D() {
 }
 /* ===== Am thanh: nhac nen chua lanh + hieu ung ===== */
 var AC = null, musicBus = null, sfxBus = null, ambBus = null, ambOn = false;
+/* ===== NHAC NEN MP3 (bai piano Nhien gui, phat vong lap lien mach) ===== */
+var MUS_CHUNKS = 7;
+var musicEl = null, musicReady = false;
+function loadMusicChunks() {
+  var i = 0;
+  function next() {
+    i++;
+    if (i > MUS_CHUNKS) { initMusicMp3(); return; }
+    var sc = document.createElement("script");
+    sc.src = "music-" + i + ".js";
+    sc.onload = next;
+    sc.onerror = function() {};
+    document.head.appendChild(sc);
+  }
+  next();
+}
+function initMusicMp3() {
+  try {
+    var b64 = "";
+    for (var k = 1; window["__MUS_B64_" + k]; k++) b64 += window["__MUS_B64_" + k];
+    if (b64.length < 10000) return;
+    var bin = atob(b64), bytes = new Uint8Array(bin.length);
+    for (var bi = 0; bi < bin.length; bi++) bytes[bi] = bin.charCodeAt(bi);
+    musicEl = new Audio();
+    musicEl.src = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
+    musicEl.loop = true; musicEl.volume = 0.55; musicEl.preload = "auto";
+    musicReady = true;
+    if (settings().music && !window.__adPlaying) { var p = musicEl.play(); if (p && p.catch) p.catch(function() {}); }
+  } catch (e) {}
+}
+loadMusicChunks();
+
 function audioInit() {
   if (AC) { if (!window.__adPlaying && AC.state !== "running") AC.resume(); return; }
   try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
@@ -656,6 +688,7 @@ function audioInit() {
   ns.connect(nf); nf.connect(ng); ng.connect(musicBus); ns.start();
   ambStart();
   startPad();
+  if (musicEl && settings().music) { var mp = musicEl.play(); if (mp && mp.catch) mp.catch(function() {}); }
 }
 /* ===== AM THANH THIEN NHIEN: suoi roc rach + de keu + ech keu (tong hop WebAudio) ===== */
 function ambStart() {
@@ -716,6 +749,7 @@ function ambFrog() {
   setTimeout(ambFrog, 5000 + Math.random() * 8000);
 }
 function bellTone(freq, vol, dur) {
+  if (musicReady) return;
   if (!AC || !musicBus) return;
   var t0 = AC.currentTime;
   [[1, 1], [2.76, 0.35], [5.4, 0.12]].forEach(function(h) {
@@ -730,7 +764,7 @@ function bellTone(freq, vol, dur) {
 var MEL_I = 2;
 var MEL_SCALE = [110, 130.81, 146.83, 164.81, 196, 220];
 function pluckNote() {
-  if (!AC || !musicBus) return;
+  if (!AC || !musicBus || musicReady) return;
   MEL_I = Math.max(0, Math.min(MEL_SCALE.length - 1, MEL_I + Math.floor(Math.random() * 5) - 2));
   var f = MEL_SCALE[MEL_I];
   var t0 = AC.currentTime;
@@ -752,7 +786,7 @@ function startPad() {
   padChord();
 }
 function padChord() {
-  if (!AC || !musicBus) return;
+  if (!AC || !musicBus || musicReady) return;
   if (settings().music) {
     var ch = PAD_CHORDS[padIdx % PAD_CHORDS.length];
     var t0 = AC.currentTime, dur = 13;
@@ -4029,6 +4063,8 @@ function chooseFlower(id) {
 var adPending = null, adInt = null, adSdkT = null, adChkT = null;
 function audioPauseForAd(on) {
   try {
+    if (on) { if (musicEl) musicEl.pause(); }
+    else if (musicEl && settings().music) { var rp = musicEl.play(); if (rp && rp.catch) rp.catch(function() {}); }
     if (!AC) return;
     if (on) {
       window.__adPlaying = true;
@@ -4225,6 +4261,7 @@ function applySettingsFx() {
   if (renderer) renderer.setPixelRatio(st.gfx === "low" ? 1 : Math.min(window.devicePixelRatio || 1, 1.5));
   FX_ON = st.fx;
   if (musicBus) musicBus.gain.value = st.music ? 0.5 : 0;
+  if (musicEl) { if (st.music) { var tp = musicEl.play(); if (tp && tp.catch) tp.catch(function() {}); } else musicEl.pause(); }
   if (sfxBus) sfxBus.gain.value = st.sfx ? 0.85 : 0;
   if (ambBus) ambBus.gain.value = st.sfx ? 0.9 : 0;
 }
