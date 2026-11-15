@@ -165,6 +165,19 @@ window.__gmLoadSdk = function (cb) {
   .d-meta { text-align: center; font-size: 12.5px; color: #b06a86; margin: 0 0 10px; }
   #detailPanel .d-actions button { background: #fff; border: 1.5px solid #f2a7c3; color: #8a2f4f; }
   #detailPanel .d-actions button:disabled { opacity: .55; }
+  .photo-pick { position: relative; }
+  .pick-badge { position: absolute; right: 6px; bottom: 6px; background: #a8402f; color: #ffe9bb; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 9px; }
+  .album-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 6px 0; }
+  .album-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 9px; cursor: pointer; border: 2px solid transparent; }
+  .album-grid img.main { border-color: #e9c46a; }
+  .alb-empty { color: #a5717f; font-size: 13.5px; margin: 4px 0; }
+  .alb-add { background: #fff; border: 1.5px solid #f2a7c3; color: #8a2f4f; border-radius: 999px; padding: 8px 14px; font-weight: 700; font-size: 13.5px; cursor: pointer; font-family: inherit; margin: 4px 0 8px; }
+  #albumView { position: fixed; inset: 0; background: rgba(24,10,16,.93); z-index: 80; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 18px; }
+  #albumView img { max-width: 92vw; max-height: 62vh; border-radius: 12px; }
+  .alb-view-btns, .alb-nav { display: flex; gap: 8px; align-items: center; }
+  .alb-view-btns button, .alb-nav button { background: #fff; border: 1.5px solid #f2a7c3; color: #8a2f4f; border-radius: 999px; padding: 8px 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .alb-nav { color: #ffe9bb; font-weight: 700; }
+  .alb-nav button { width: 40px; height: 40px; border-radius: 50%; font-size: 20px; padding: 0; }
   #detailPanel #visitList li { border-bottom-color: rgba(176,48,96,.18); }
   #detailPanel #visitList li span { color: #b06a86; }
   #boxPos { background: rgba(255,240,245,.94); color: #8a2f4f; }
@@ -274,7 +287,7 @@ window.__gmLoadSdk = function (cb) {
       <div class="photo-pick" id="photoPick" onclick="document.getElementById('photoInput').click()">
         <span class="big">📷</span><span>Thêm ảnh</span>
       </div>
-      <input type="file" id="photoInput" accept="image/*" style="display:none">
+      <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
       <label class="f-label">Tên của bé</label>
       <input class="f-input" id="newName" maxlength="24" placeholder="Ví dụ: Bella">
       <label class="f-label">Bé là…</label>
@@ -291,6 +304,11 @@ window.__gmLoadSdk = function (cb) {
       <div id="extras" style="display:none">
         <label class="f-label">Năm sinh – năm mất</label>
         <input class="f-input" id="newYears" maxlength="20" placeholder="Ví dụ: 2019 – 2025">
+        <div class="f-row">
+          <div><label class="f-label">🎂 Ngày sinh</label><input class="f-input" id="newBirth" type="date"></div>
+          <div><label class="f-label">🕊️ Ngày mất</label><input class="f-input" id="newDeath" type="date"></div>
+        </div>
+        <p class="note">Đúng ngày sinh nhật, bé sẽ được dựng khung ảnh lớn trước cửa miếu kèm hoa, nến và quà 🎂</p>
         <div class="f-row">
           <div>
             <label class="f-label">Ngày đặc biệt</label>
@@ -327,6 +345,24 @@ window.__gmLoadSdk = function (cb) {
       <button onclick="openFlowerPanel()">🌸 Dâng hoa</button>
       <button onclick="openGiftPanel()">🎁 Tặng quà</button>
       <button onclick="openDecoPanel()">🎨 Trang trí ô</button>
+    </div>
+    <h4>📸 Album kỷ niệm <span id="albumCount"></span></h4>
+    <div id="albumGrid" class="album-grid"></div>
+    <button class="alb-add" onclick="document.getElementById('albumInput').click()">＋ Thêm ảnh vào album</button>
+    <input type="file" id="albumInput" accept="image/*" multiple style="display:none">
+    <div class="f-row">
+      <div><label class="f-label">🎂 Ngày sinh</label><input class="f-input" id="petBirth" type="date"></div>
+      <div><label class="f-label">🕊️ Ngày mất</label><input class="f-input" id="petDeath" type="date"></div>
+    </div>
+    <button class="alb-add" onclick="savePetDates()">💾 Lưu ngày tháng</button>
+    <div id="albumView">
+      <img id="albumImg" alt="">
+      <div class="alb-nav"><button onclick="albumNav(-1)">‹</button><span id="albumIdx"></span><button onclick="albumNav(1)">›</button></div>
+      <div class="alb-view-btns">
+        <button onclick="albumSetMain()">⭐ Đặt làm ảnh chính</button>
+        <button onclick="albumDelete()">🗑️ Xóa ảnh</button>
+        <button onclick="albumClose()">Đóng</button>
+      </div>
     </div>
     <h4>🧾 Những người đã ghé thăm bé</h4>
     <ul id="visitList"></ul>
@@ -3625,7 +3661,7 @@ function animate() {
   renderer.render(scene, camera);
 }
 /* ================= TUONG TAC: THEM BE / THAM GIAN ================= */
-var addPos = null, pendingPhoto = null, selectedKind = "dog", currentPos = null, removeArmed = false;
+var addPos = null, pendingPhoto = null, pendingPhotos = [], selectedKind = "dog", currentPos = null, removeArmed = false;
 var PICK_DEFAULT = '<span class="big">📷</span><span>Thêm ảnh</span>';
 function addMine3D() {
   for (var i = 0; i < NCELLS; i++) if (!U.shrines[i]) {
@@ -3637,12 +3673,12 @@ function addMine3D() {
   toast("Cả 4 tầng đã đầy rồi bạn ơi 🥹");
 }
 function openAdd3D(idx) {
-  addPos = idx; pendingPhoto = null;
+  addPos = idx; pendingPhoto = null; pendingPhotos = [];
   document.getElementById("addPosLabel").textContent = posLabel(idx);
   var _lc = idx % PER_FLOOR; document.getElementById("addZoneLabel").textContent = "Tầng " + (Math.floor(idx / PER_FLOOR) + 1) + " · Dãy " + (_lc < 24 ? "A" : _lc < 48 ? "B" : _lc < 60 ? "C" : "D");
   document.getElementById("photoPick").innerHTML = PICK_DEFAULT;
   document.getElementById("photoInput").value = "";
-  ["newName", "newYears", "newSpecialDay", "newMsg", "newEmail"].forEach(function(id) { document.getElementById(id).value = ""; });
+  ["newName", "newYears", "newSpecialDay", "newMsg", "newEmail", "newBirth", "newDeath"].forEach(function(id) { document.getElementById(id).value = ""; });
   document.getElementById("newSpecialType").value = "";
   document.getElementById("newFlag").checked = true;
   document.getElementById("extras").style.display = "none";
@@ -3659,9 +3695,7 @@ function toggleExtras3D() {
   var e = document.getElementById("extras");
   e.style.display = e.style.display === "none" ? "block" : "none";
 }
-document.getElementById("photoInput").addEventListener("change", function(ev) {
-  var f = ev.target.files && ev.target.files[0];
-  if (!f) return;
+function fileToPhoto(file, cb) {
   var rd = new FileReader();
   rd.onload = function() {
     var img = new Image();
@@ -3670,12 +3704,26 @@ document.getElementById("photoInput").addEventListener("change", function(ev) {
       var cv = document.createElement("canvas");
       cv.width = Math.round(w * sc); cv.height = Math.round(h * sc);
       cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
-      pendingPhoto = cv.toDataURL("image/jpeg", 0.82);
-      document.getElementById("photoPick").innerHTML = '<img src="' + pendingPhoto + '" alt="">';
+      cb(cv.toDataURL("image/jpeg", 0.82));
     };
     img.src = rd.result;
   };
-  rd.readAsDataURL(f);
+  rd.readAsDataURL(file);
+}
+document.getElementById("photoInput").addEventListener("change", function(ev) {
+  var files = ev.target.files;
+  if (!files || !files.length) return;
+  pendingPhotos = [];
+  var i = 0;
+  function next() {
+    if (i >= files.length || pendingPhotos.length >= 8) {
+      pendingPhoto = pendingPhotos[0] || null;
+      if (pendingPhoto) document.getElementById("photoPick").innerHTML = '<img src="' + pendingPhoto + '" alt="">' + (pendingPhotos.length > 1 ? '<span class="pick-badge">' + pendingPhotos.length + ' ảnh</span>' : '');
+      return;
+    }
+    fileToPhoto(files[i], function(url) { pendingPhotos.push(url); i++; next(); });
+  }
+  next();
 });
 function createShrine3D() {
   var name = document.getElementById("newName").value.trim();
@@ -3690,6 +3738,9 @@ function createShrine3D() {
     email: document.getElementById("newEmail").value.trim(),
     showFlag: document.getElementById("newFlag").checked,
     photo: pendingPhoto,
+    photos: pendingPhotos.slice(0, 8),
+    birth: document.getElementById("newBirth").value || "",
+    death: document.getElementById("newDeath").value || "",
     candles: 0, flowers: 0, incense: 0, gifts: 0, gb: []
   };
   saveState();
@@ -4095,17 +4146,173 @@ function renderVisitList() {
   }).join("");
 }
 
+/* ===== ALBUM KY NIEM + NGAY SINH / NGAY MAT + SINH NHAT TRUOC CUA ===== */
+function fmtDate(iso) { var p = (iso || "").split("-"); return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : (iso || ""); }
+function vnTodayMD() {
+  var n = new Date();
+  var vn = new Date(n.getTime() + n.getTimezoneOffset() * 60000 + 7 * 3600000);
+  return { m: vn.getMonth() + 1, d: vn.getDate() };
+}
+function isBirthdayToday(sh) {
+  if (!sh || !sh.birth) return false;
+  var p = sh.birth.split("-"); if (p.length !== 3) return false;
+  var t = vnTodayMD();
+  return parseInt(p[1], 10) === t.m && parseInt(p[2], 10) === t.d;
+}
+function renderDetailMeta(sh) {
+  var dm = sh.years + (sh.special ? " · ⭐ " + sh.special : "");
+  if (sh.birth) dm += " · 🎂 " + fmtDate(sh.birth);
+  if (sh.death) dm += " · 🕊️ " + fmtDate(sh.death);
+  if (isBirthdayToday(sh)) dm += " · 🎉 Hôm nay là sinh nhật của bé!";
+  document.getElementById("dMeta").textContent = dm;
+}
+function albumOf(sh) { if (sh.photos && sh.photos.length) return sh.photos; return sh.photo ? [sh.photo] : []; }
+function persistShrine(idx) { saveState(); if (U.shrines[idx]) dbPatch("/shrines/" + idx, U.shrines[idx]); }
+var albumViewIdx = 0;
+function renderAlbum() {
+  var sh = U.shrines[currentPos]; if (!sh) return;
+  var alb = albumOf(sh);
+  document.getElementById("albumCount").textContent = alb.length ? "(" + alb.length + "/8 ảnh)" : "";
+  var grid = document.getElementById("albumGrid");
+  grid.innerHTML = "";
+  alb.forEach(function(url, i) {
+    var im = document.createElement("img");
+    im.src = url; im.alt = "";
+    if (i === 0) im.className = "main";
+    im.onclick = function() { albumOpen(i); };
+    grid.appendChild(im);
+  });
+  if (!alb.length) grid.innerHTML = '<p class="alb-empty">Chưa có ảnh nào — thêm ảnh kỷ niệm của bé nhé 📷</p>';
+  document.getElementById("petBirth").value = sh.birth || "";
+  document.getElementById("petDeath").value = sh.death || "";
+}
+function albumOpen(i) { albumViewIdx = i; albumShow(); document.getElementById("albumView").style.display = "flex"; }
+function albumShow() {
+  var sh = U.shrines[currentPos]; if (!sh) return;
+  var alb = albumOf(sh);
+  if (!alb.length) { albumClose(); return; }
+  albumViewIdx = Math.max(0, Math.min(alb.length - 1, albumViewIdx));
+  document.getElementById("albumImg").src = alb[albumViewIdx];
+  document.getElementById("albumIdx").textContent = (albumViewIdx + 1) + " / " + alb.length + (albumViewIdx === 0 ? " · ảnh chính ⭐" : "");
+}
+function albumNav(d) { albumViewIdx += d; albumShow(); }
+function albumClose() { document.getElementById("albumView").style.display = "none"; }
+function albumSetMain() {
+  var sh = U.shrines[currentPos]; if (!sh) return;
+  var alb = albumOf(sh).slice();
+  var it = alb.splice(albumViewIdx, 1)[0]; alb.unshift(it);
+  sh.photos = alb; sh.photo = alb[0]; albumViewIdx = 0;
+  albumShow(); renderAlbum(); persistShrine(currentPos); refreshCell(currentPos); if (boxR) refreshBox();
+  toast("Đã đặt làm ảnh chính ⭐");
+}
+function albumDelete() {
+  var sh = U.shrines[currentPos]; if (!sh) return;
+  var alb = albumOf(sh).slice();
+  alb.splice(albumViewIdx, 1);
+  sh.photos = alb; sh.photo = alb[0] || null;
+  albumShow(); renderAlbum(); persistShrine(currentPos); refreshCell(currentPos); if (boxR) refreshBox();
+}
+function savePetDates() {
+  var sh = U.shrines[currentPos]; if (!sh) return;
+  sh.birth = document.getElementById("petBirth").value || "";
+  sh.death = document.getElementById("petDeath").value || "";
+  persistShrine(currentPos);
+  renderDetailMeta(sh);
+  checkBirthdays(true);
+  toast("Đã lưu ngày tháng cho " + sh.name + " 💾");
+}
+document.getElementById("albumInput").addEventListener("change", function(ev) {
+  var files = ev.target.files;
+  if (!files || !files.length) return;
+  var sh = U.shrines[currentPos]; if (!sh) return;
+  var alb = albumOf(sh).slice();
+  var i = 0;
+  function next() {
+    if (i >= files.length) {
+      sh.photos = alb; if (!sh.photo) sh.photo = alb[0] || null;
+      persistShrine(currentPos); renderAlbum(); refreshCell(currentPos); if (boxR) refreshBox();
+      toast("Đã thêm ảnh vào album của " + sh.name + " 📸");
+      ev.target.value = "";
+      return;
+    }
+    if (alb.length >= 8) { toast("Album tối đa 8 ảnh thôi bạn nhé"); i = files.length; next(); return; }
+    fileToPhoto(files[i], function(url) { alb.push(url); i++; next(); });
+  }
+  next();
+});
+var BDAY_GROUP = null, BDAY_KEY = "";
+function buildBirthdayStand(sh, x, ry) {
+  var g = new THREE.Group();
+  var woodM = new THREE.MeshStandardMaterial({ color: 0x8a5a34, roughness: 0.8 });
+  var goldM = new THREE.MeshStandardMaterial({ color: 0xe9c46a, metalness: 0.7, roughness: 0.3 });
+  [-0.42, 0.42].forEach(function(lx) {
+    var leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.9, 0.07), woodM);
+    leg.position.set(lx, 0.95, 0); leg.rotation.x = 0.1; g.add(leg);
+  });
+  var backLeg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.8, 0.07), woodM);
+  backLeg.position.set(0, 0.88, -0.4); backLeg.rotation.x = -0.5; g.add(backLeg);
+  var bar = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.07, 0.1), woodM);
+  bar.position.set(0, 0.6, 0.1); g.add(bar);
+  var frame = new THREE.Mesh(new THREE.BoxGeometry(1.16, 1.44, 0.06), goldM);
+  frame.position.set(0, 1.42, 0.04); frame.rotation.x = 0.1; g.add(frame);
+  var photo = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.28), new THREE.MeshBasicMaterial({ color: 0x444444 }));
+  photo.position.set(0, 1.42, 0.085); photo.rotation.x = 0.1; g.add(photo);
+  if (sh.photo) {
+    var img = new Image();
+    img.onload = function() { photo.material.map = coverTexture(img, 376, 456); photo.material.color.set(0xffffff); photo.material.needsUpdate = true; };
+    img.src = sh.photo;
+  } else {
+    photo.material.map = placeholderTexture(sh.name, sh.kind);
+    photo.material.color.set(0xffffff); photo.material.needsUpdate = true;
+  }
+  var pqb = plaqueTexture(sh.name);
+  var plaque = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.34), new THREE.MeshBasicMaterial({ map: pqb.tex, transparent: true }));
+  plaque.scale.x = Math.min(1.15, Math.max(0.35, pqb.aspect * 0.34 / 1.3));
+  plaque.position.set(0, 0.42, 0.14); g.add(plaque);
+  var cake = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.14, 14), new THREE.MeshStandardMaterial({ color: 0xfff3f6, roughness: 0.6 }));
+  cake.position.set(0, 0.07, 0.55); g.add(cake);
+  var cakeTop = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.1, 14), new THREE.MeshStandardMaterial({ color: 0xffb7d5, roughness: 0.6 }));
+  cakeTop.position.set(0, 0.19, 0.55); g.add(cakeTop);
+  var fl1 = buildFlowerContent("rose"); fl1.position.set(-0.66, 0, 0.3); g.add(fl1);
+  var fl2 = buildFlowerContent("sunflower"); fl2.position.set(0.66, 0, 0.3); g.add(fl2);
+  var fl3 = buildFlowerContent("lotus"); fl3.position.set(0.3, 0, 0.62); g.add(fl3);
+  var gf1 = buildGiftContent("food"); gf1.scale.setScalar(1.25); gf1.position.set(-0.34, 0.02, 0.58); g.add(gf1);
+  var gf2 = buildGiftContent("yarn"); gf2.scale.setScalar(1.25); gf2.position.set(-0.62, 0.02, 0.58); g.add(gf2);
+  [-0.52, 0.52].forEach(function(cx) { var cd = makeFloorCandle(0, 0, 0.34); cd.position.set(cx, 0, 0.6); g.add(cd); });
+  g.position.set(x, 0, 10.7);
+  g.rotation.y = ry;
+  return g;
+}
+function checkBirthdays(force) {
+  if (typeof scene === "undefined" || !scene) return;
+  var list = [];
+  for (var i = 0; i < NCELLS; i++) if (U.shrines[i] && isBirthdayToday(U.shrines[i])) list.push(i);
+  var key = list.join(",");
+  if (!force && key === BDAY_KEY) return;
+  BDAY_KEY = key;
+  if (BDAY_GROUP) { scene.remove(BDAY_GROUP); BDAY_GROUP = null; }
+  if (!list.length) return;
+  BDAY_GROUP = new THREE.Group();
+  var spots = [[-2.7, -0.35], [2.7, 0.35]];
+  list.slice(0, 2).forEach(function(idx, k) { BDAY_GROUP.add(buildBirthdayStand(U.shrines[idx], spots[k][0], spots[k][1])); });
+  scene.add(BDAY_GROUP);
+  if (!window.__bdayToasted) {
+    window.__bdayToasted = true;
+    toast("🎂 Hôm nay là sinh nhật của " + list.map(function(i) { return U.shrines[i].name; }).join(", ") + " — bé đang ở trước cửa miếu!");
+  }
+}
+
 function openDetail3D(idx) {
   currentPos = idx; removeArmed = false;
   var sh = U.shrines[idx];
   if (!sh) return;
   document.getElementById("dMsg").textContent = "“" + sh.msg + "”";
-  document.getElementById("dMeta").textContent = sh.years + (sh.special ? " · ⭐ " + sh.special : "");
+  renderDetailMeta(sh);
   updateDetailCounts();
   document.querySelector("#detailPanel .danger").textContent = "Thu hồi ô này (gỡ di ảnh)";
   renderGB3D();
   document.getElementById("detailPanel").style.display = "block";
-  initBox(); refreshBox(); renderVisitList();
+  initBox(); refreshBox(); renderVisitList(); renderAlbum();
   if (!boxAnim) boxLoop();
 }
 function closeDetail3D() { document.getElementById("detailPanel").style.display = "none"; }
@@ -4633,6 +4840,7 @@ function applyServerShrines(data) {
     }
   });
   saveState();
+  checkBirthdays(false);
 }
 function syncInit() {
   if (!DB_URL) return;
