@@ -155,6 +155,14 @@ window.__gmLoadSdk = function (cb) {
   .box-lights { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 6px; z-index: 3; }
   .box-lights button { border: none; border-radius: 999px; background: rgba(20,12,4,.55); color: #ffe9bb; font-size: 12.5px; font-weight: 700; padding: 7px 11px; cursor: pointer; font-family: inherit; }
   .box-lights button.on { background: #ffb84d; color: #5b3410; }
+  #petBar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 54px; z-index: 6; display: flex; gap: 7px; align-items: center; background: rgba(30,16,8,.55); border-radius: 999px; padding: 6px 10px; }
+  #petBar span { color: #ffe9bb; font-weight: 700; font-size: 13px; padding: 0 4px; white-space: nowrap; }
+  #petBar button { border: none; border-radius: 999px; background: rgba(255,255,255,.92); color: #8a2f4f; font-weight: 700; font-size: 13px; padding: 7px 12px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .pet-row { display: flex; flex-wrap: wrap; gap: 7px; margin: 4px 0 10px; }
+  .pet-sw { width: 34px; height: 34px; border-radius: 50%; border: 2.5px solid rgba(0,0,0,.15); cursor: pointer; padding: 0; }
+  .pet-sw.sel { border-color: #a8402f; transform: scale(1.14); }
+  .pet-opt { border: 1.5px solid #f2a7c3; background: #fff; color: #8a2f4f; border-radius: 999px; padding: 7px 12px; font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .pet-opt.sel { background: #a8402f; color: #ffe9bb; border-color: #a8402f; }
   #boxPos { position: absolute; left: 50%; transform: translateX(-50%); top: 8px; background: rgba(248,238,218,.92); color: #43301b; font-size: 12px; padding: 3px 12px; border-radius: 999px; z-index: 3; white-space: nowrap; }
   #visitList { list-style: none; margin: 6px 0 10px; padding: 0; max-height: 180px; overflow-y: auto; }
   #visitList li { padding: 6px 8px; border-bottom: 1px dashed rgba(67,48,27,.18); font-size: 13.5px; }
@@ -278,6 +286,33 @@ window.__gmLoadSdk = function (cb) {
   <div class="hintbar">🖱️ Kéo chuột/ngón tay để xoay camera · WASD hoặc phím mũi tên để đi · Bấm vào một ô trên vách để thăm / đặt chỗ</div>
   <div id="joy"><div id="joyKnob"></div></div>
 
+  <div id="petBar" style="display:none">
+    <span id="petBarName"></span>
+    <button id="carryBtn" onclick="petCarryToggle()">🤲 Bế bé</button>
+    <button onclick="petStroke()">🖐️ Vuốt ve</button>
+    <button onclick="petCall()">📣 Gọi bé</button>
+  </div>
+  <div class="modal-bg" id="petModal" style="z-index:45">
+    <div class="modal">
+      <button class="modal-x" onclick="closePetPanel()">✕</button>
+      <h3>🐱 Gặp lại <span id="petModalName"></span></h3>
+      <p class="modal-sub">Chọn màu lông và phụ kiện cho bé — bé sẽ xuất hiện, kêu meo meo và đi theo bạn khắp khuôn viên miếu.</p>
+      <div id="petOpts">
+        <label class="f-label">Màu lông</label>
+        <div class="pet-row" id="petFurs"></div>
+        <label class="f-label">Họa tiết</label>
+        <div class="pet-row" id="petPat"></div>
+        <label class="f-label">Màu mắt</label>
+        <div class="pet-row" id="petEye"></div>
+        <label class="f-label">Phụ kiện</label>
+        <div class="pet-row" id="petAcc"></div>
+      </div>
+      <p class="note" id="petOwnerNote" style="display:none">Chỉ chủ của bé mới đổi màu cho bé được — bạn vẫn có thể bấm Gặp lại để bé đi cùng 💕</p>
+      <button class="big-btn" onclick="confirmPet()">💕 Gặp lại bé</button>
+      <button class="alb-add" id="petByeBtn" style="display:none" onclick="petBye()">👋 Tạm biệt bé</button>
+    </div>
+  </div>
+
   <!-- MODAL THEM BE -->
   <div class="modal-bg" id="addModal">
     <div class="modal">
@@ -345,6 +380,7 @@ window.__gmLoadSdk = function (cb) {
       <button onclick="openFlowerPanel()">🌸 Dâng hoa</button>
       <button onclick="openGiftPanel()">🎁 Tặng quà</button>
       <button onclick="openDecoPanel()">🎨 Trang trí ô</button>
+      <button onclick="openPetPanel()">🐱 Gặp lại bé</button>
     </div>
     <h4>📸 Album kỷ niệm <span id="albumCount"></span></h4>
     <div id="albumGrid" class="album-grid"></div>
@@ -3521,6 +3557,7 @@ function animate() {
     else avatar.position.y *= 0.8;
   }
   updateChibiAnim(dt, moving);
+  updatePet(dt, t);
   var dist = 5.4 * camDistMul;
   var camOff = new THREE.Vector3(
     Math.sin(camYaw) * Math.cos(camPitch),
@@ -3754,6 +3791,7 @@ function createShrine3D() {
   closeAdd3D();
   toast("Đã đặt chỗ cho " + name + " ở ô " + posLabel(addPos) + " 🕯️");
   openDetail3D(addPos);
+  openPetPanel();
 }
 
 /* ===== Hop gian 3D trong cua so chi tiet (phong cach Light a Paw) ===== */
@@ -4152,6 +4190,308 @@ function renderVisitList() {
   }).join("");
 }
 
+/* ===== THU CUNG AO: meo di theo nguoi choi (Gap lai / be / vuot ve / tieng keu) ===== */
+var PET = null, PET_HEARTS = [], PURR = null, HEART_TEX = null;
+var PET_FURS = ["#f5f0e6", "#3b3230", "#e8913a", "#9c6b4f", "#b8b4ae", "#f2c14e", "#7a4a2b", "#e8b4c8"];
+var petDraft = null, petForIdx = null;
+function petCfgOf(sh) { return (sh && sh.pet) || { fur: "#e8913a", pattern: "tron", eye: "#3f7a3a", acc: "chuong" }; }
+function petFurTexture(cfg) {
+  var cv = document.createElement("canvas"); cv.width = cv.height = 128;
+  var g = cv.getContext("2d");
+  g.fillStyle = cfg.fur; g.fillRect(0, 0, 128, 128);
+  if (cfg.pattern === "van") {
+    g.fillStyle = "rgba(0,0,0,0.16)";
+    for (var i = 0; i < 6; i++) g.fillRect(8 + i * 21, 0, 7, 128);
+  } else if (cfg.pattern === "dom") {
+    g.fillStyle = "rgba(0,0,0,0.15)";
+    [[30, 40, 20], [86, 26, 15], [66, 88, 24], [104, 74, 13]].forEach(function(b) {
+      g.beginPath(); g.arc(b[0], b[1], b[2], 0, 7); g.fill();
+    });
+  }
+  return new THREE.CanvasTexture(cv);
+}
+function makePetTag(name) {
+  var cv = document.createElement("canvas"); cv.width = 256; cv.height = 64;
+  var g = cv.getContext("2d");
+  g.fillStyle = "rgba(60,28,40,0.55)";
+  g.beginPath();
+  if (g.roundRect) g.roundRect(28, 8, 200, 48, 24); else g.rect(28, 8, 200, 48);
+  g.fill();
+  g.fillStyle = "#ffe9f2"; g.font = "bold 30px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText("🐱 " + name, 128, 34);
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
+  sp.scale.set(0.95, 0.24, 1);
+  return sp;
+}
+function buildPetCat(cfg, name) {
+  var g = new THREE.Group();
+  var fur = new THREE.MeshStandardMaterial({ map: petFurTexture(cfg), roughness: 0.92 });
+  var cream = new THREE.MeshStandardMaterial({ color: 0xfff6ea, roughness: 0.95 });
+  var P = {};
+  var bodyG = new THREE.Group(); bodyG.position.y = 0.30; g.add(bodyG); P.bodyG = bodyG;
+  var body = new THREE.Mesh(new THREE.SphereGeometry(0.19, 18, 14), fur);
+  body.scale.set(0.92, 0.92, 1.5); bodyG.add(body);
+  var chest = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), cream);
+  chest.position.set(0, -0.05, 0.17); chest.scale.set(0.9, 1, 0.8); bodyG.add(chest);
+  var headG = new THREE.Group(); headG.position.set(0, 0.14, 0.27); bodyG.add(headG); P.head = headG;
+  headG.add(new THREE.Mesh(new THREE.SphereGeometry(0.145, 18, 14), fur));
+  var muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 10), cream);
+  muzzle.position.set(0, -0.045, 0.1); muzzle.scale.set(1.15, 0.75, 0.9); headG.add(muzzle);
+  var nose = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 8), new THREE.MeshStandardMaterial({ color: 0xe77a90, roughness: 0.6 }));
+  nose.position.set(0, -0.02, 0.165); headG.add(nose);
+  P.ears = [];
+  [-1, 1].forEach(function(s) {
+    var ear = new THREE.Group(); ear.position.set(s * 0.085, 0.115, 0);
+    var cone = new THREE.Mesh(new THREE.ConeGeometry(0.058, 0.12, 4), fur);
+    cone.position.y = 0.05; cone.rotation.y = Math.PI / 4; ear.add(cone);
+    var inner = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.07, 4), new THREE.MeshStandardMaterial({ color: 0xf6b8c8, roughness: 0.8 }));
+    inner.position.set(0, 0.04, 0.018); inner.rotation.y = Math.PI / 4; ear.add(inner);
+    ear.rotation.z = -s * 0.16;
+    headG.add(ear); P.ears.push(ear);
+  });
+  P.eyes = [];
+  [-1, 1].forEach(function(s) {
+    var eye = new THREE.Mesh(new THREE.SphereGeometry(0.021, 10, 10), new THREE.MeshStandardMaterial({ color: cfg.eye, roughness: 0.25 }));
+    eye.position.set(s * 0.058, 0.025, 0.128); headG.add(eye); P.eyes.push(eye);
+  });
+  P.legs = [];
+  [[-0.09, 0.16], [0.09, 0.16], [-0.09, -0.16], [0.09, -0.16]].forEach(function(lp) {
+    var leg = new THREE.Group(); leg.position.set(lp[0], -0.06, lp[1]); bodyG.add(leg);
+    var cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.026, 0.24, 8), fur);
+    cyl.position.y = -0.12; leg.add(cyl);
+    var paw = new THREE.Mesh(new THREE.SphereGeometry(0.034, 8, 8), cream);
+    paw.position.set(0, -0.235, 0.012); paw.scale.set(1, 0.6, 1.25); leg.add(paw);
+    P.legs.push(leg);
+  });
+  var tailBase = new THREE.Group(); tailBase.position.set(0, 0.08, -0.27); bodyG.add(tailBase); P.tail = tailBase;
+  var t1 = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.03, 0.17, 8), fur); t1.position.y = 0.085; tailBase.add(t1);
+  var tailMid = new THREE.Group(); tailMid.position.y = 0.17; tailBase.add(tailMid); P.tailMid = tailMid;
+  var t2 = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.15, 8), fur); t2.position.y = 0.075; tailMid.add(t2);
+  var tip = new THREE.Mesh(new THREE.SphereGeometry(0.026, 8, 8), cream); tip.position.y = 0.16; tailMid.add(tip);
+  if (cfg.acc === "chuong" || cfg.acc === "vong") {
+    var collar = new THREE.Mesh(new THREE.TorusGeometry(0.105, 0.016, 8, 20), new THREE.MeshStandardMaterial({ color: cfg.acc === "chuong" ? 0xd43d4f : 0x3d7ad4, roughness: 0.5 }));
+    collar.position.set(0, 0.05, 0.235); collar.rotation.x = 1.25; bodyG.add(collar);
+    if (cfg.acc === "chuong") {
+      var bell = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 10), new THREE.MeshStandardMaterial({ color: 0xe9c46a, metalness: 0.75, roughness: 0.3 }));
+      bell.position.set(0, -0.045, 0.315); bodyG.add(bell);
+    }
+  } else if (cfg.acc === "no") {
+    var bow = new THREE.Group(); bow.position.set(0.1, 0.17, 0.02);
+    var bm = new THREE.MeshStandardMaterial({ color: 0xf27ba7, roughness: 0.6 });
+    [-1, 1].forEach(function(s) { var c = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.07, 6), bm); c.rotation.z = s * 1.85; c.position.x = s * 0.038; bow.add(c); });
+    bow.add(new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), bm));
+    headG.add(bow);
+  }
+  var tag = makePetTag(name); tag.position.y = 0.8; g.add(tag);
+  g.userData.parts = P;
+  return g;
+}
+function spawnPet(idx) {
+  var sh = U.shrines[idx]; if (!sh) return;
+  despawnPet();
+  var g = buildPetCat(petCfgOf(sh), sh.name);
+  g.position.copy(avatar.position).add(new THREE.Vector3(0.9, 0, 0.9));
+  scene.add(g);
+  PET = { g: g, P: g.userData.parts, idx: idx, mode: "follow", phase: 0, idleT: 0, petT: 0, meowT: 9 + Math.random() * 12, heartT: 0, sitting: false, earT: 2.5, earFlick: 0 };
+  document.getElementById("petBar").style.display = "flex";
+  document.getElementById("petBarName").textContent = "🐱 " + sh.name;
+  document.getElementById("carryBtn").textContent = "🤲 Bế bé";
+  setTimeout(function() { meow(1); }, 450);
+  toast("🐱 " + sh.name + " đã quay về bên bạn!");
+}
+function despawnPet() {
+  if (PET) { scene.remove(PET.g); PET = null; stopPurr(); }
+  for (var i = 0; i < PET_HEARTS.length; i++) scene.remove(PET_HEARTS[i].sp);
+  PET_HEARTS = [];
+  var pb = document.getElementById("petBar"); if (pb) pb.style.display = "none";
+}
+function petCarryToggle() {
+  if (!PET) return;
+  if (PET.mode === "carry") {
+    PET.mode = "follow"; PET.idleT = 0;
+    document.getElementById("carryBtn").textContent = "🤲 Bế bé";
+  } else {
+    PET.mode = "carry";
+    document.getElementById("carryBtn").textContent = "⬇️ Thả bé xuống";
+    meow(0.8);
+  }
+}
+function petStroke() {
+  if (!PET) return;
+  PET.petT = 2.4;
+  startPurr();
+  meow(0.9);
+}
+function petCall() {
+  if (!PET) return;
+  PET.mode = "follow";
+  document.getElementById("carryBtn").textContent = "🤲 Bế bé";
+  PET.g.position.set(avatar.position.x + 1.1, avatar.position.y, avatar.position.z + 0.7);
+  meow(1);
+}
+function setPetEyes(s) { if (PET) for (var i = 0; i < PET.P.eyes.length; i++) PET.P.eyes[i].scale.y = s; }
+function heartTexture() {
+  if (HEART_TEX) return HEART_TEX;
+  var cv = document.createElement("canvas"); cv.width = cv.height = 64;
+  var g2 = cv.getContext("2d");
+  g2.fillStyle = "#ffffff";
+  g2.beginPath();
+  g2.moveTo(32, 56);
+  g2.bezierCurveTo(4, 32, 8, 6, 24, 8);
+  g2.bezierCurveTo(29, 9, 32, 14, 32, 18);
+  g2.bezierCurveTo(32, 14, 35, 9, 40, 8);
+  g2.bezierCurveTo(56, 6, 60, 32, 32, 56);
+  g2.fill();
+  HEART_TEX = new THREE.CanvasTexture(cv);
+  return HEART_TEX;
+}
+function spawnHeart(pos) {
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: heartTexture(), color: 0xff7ba9, transparent: true, opacity: 0.95, depthWrite: false }));
+  sp.scale.set(0.16, 0.16, 1);
+  sp.position.set(pos.x + (Math.random() - 0.5) * 0.3, pos.y + 0.62, pos.z + (Math.random() - 0.5) * 0.3);
+  scene.add(sp);
+  PET_HEARTS.push({ sp: sp, life: 1.1, seed: Math.random() * 9 });
+}
+function meow(vol) {
+  if (!AC || !settings().sfx) return;
+  try {
+    var t0 = AC.currentTime + 0.01;
+    var o = AC.createOscillator(); o.type = "sawtooth";
+    var o2 = AC.createOscillator(); o2.type = "triangle";
+    var f = AC.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 1500; f.Q.value = 2;
+    var gn = AC.createGain();
+    var v = (vol || 1) * 0.085;
+    o.frequency.setValueAtTime(520, t0);
+    o.frequency.exponentialRampToValueAtTime(840, t0 + 0.13);
+    o.frequency.exponentialRampToValueAtTime(660, t0 + 0.3);
+    o.frequency.exponentialRampToValueAtTime(330, t0 + 0.52);
+    o2.frequency.setValueAtTime(780, t0);
+    o2.frequency.exponentialRampToValueAtTime(1200, t0 + 0.13);
+    o2.frequency.exponentialRampToValueAtTime(990, t0 + 0.3);
+    o2.frequency.exponentialRampToValueAtTime(500, t0 + 0.52);
+    var lfo = AC.createOscillator(); lfo.frequency.value = 26;
+    var lg = AC.createGain(); lg.gain.value = 14;
+    lfo.connect(lg); lg.connect(o.frequency);
+    gn.gain.setValueAtTime(0, t0);
+    gn.gain.linearRampToValueAtTime(v, t0 + 0.06);
+    gn.gain.setValueAtTime(v, t0 + 0.34);
+    gn.gain.linearRampToValueAtTime(0, t0 + 0.55);
+    o.connect(f); o2.connect(f); f.connect(gn); gn.connect(AC.destination);
+    o.start(t0); o2.start(t0); lfo.start(t0);
+    o.stop(t0 + 0.6); o2.stop(t0 + 0.6); lfo.stop(t0 + 0.6);
+  } catch (e) {}
+}
+function startPurr() {
+  if (!AC || !settings().sfx || PURR) return;
+  try {
+    var o = AC.createOscillator(); o.type = "sawtooth"; o.frequency.value = 54;
+    var f = AC.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 240;
+    var gn = AC.createGain(); gn.gain.value = 0.03;
+    var lfo = AC.createOscillator(); lfo.frequency.value = 23;
+    var lg = AC.createGain(); lg.gain.value = 0.026;
+    lfo.connect(lg); lg.connect(gn.gain);
+    o.connect(f); f.connect(gn); gn.connect(AC.destination);
+    o.start(); lfo.start();
+    PURR = { o: o, lfo: lfo, gn: gn };
+  } catch (e) {}
+}
+function stopPurr() {
+  if (!PURR) return;
+  var p = PURR; PURR = null;
+  try {
+    p.gn.gain.linearRampToValueAtTime(0, AC.currentTime + 0.15);
+    setTimeout(function() { try { p.o.stop(); p.lfo.stop(); } catch (e) {} }, 220);
+  } catch (e) {}
+}
+function updatePet(dt, t) {
+  for (var hi = PET_HEARTS.length - 1; hi >= 0; hi--) {
+    var H = PET_HEARTS[hi]; H.life -= dt;
+    if (H.life <= 0) { scene.remove(H.sp); PET_HEARTS.splice(hi, 1); }
+    else { H.sp.position.y += dt * 0.35; H.sp.position.x += Math.sin(t * 3 + H.seed) * dt * 0.08; H.sp.material.opacity = Math.min(0.95, H.life / 0.5); }
+  }
+  if (!PET || !avatar) return;
+  var P = PET.P, g = PET.g, li;
+  if (PET.mode === "carry") {
+    var fwdV = new THREE.Vector3(Math.sin(avatar.rotation.y), 0, Math.cos(avatar.rotation.y));
+    g.position.copy(avatar.position).addScaledVector(fwdV, 0.37);
+    g.position.y = avatar.position.y + 1.0 + Math.sin(t * 2.1) * 0.015;
+    var dc = avatar.rotation.y - g.rotation.y;
+    while (dc > Math.PI) dc -= Math.PI * 2;
+    while (dc < -Math.PI) dc += Math.PI * 2;
+    g.rotation.y += dc * Math.min(1, dt * 10);
+    P.bodyG.position.y = 0.30; P.bodyG.rotation.x = -0.22;
+    for (li = 0; li < 4; li++) P.legs[li].rotation.x = (li < 2 ? 0.55 : 0.3) + Math.sin(t * 2.4 + li * 1.7) * 0.07;
+    P.tail.rotation.x = 2.55; P.tail.rotation.z = 0; P.tail.rotation.y = 0;
+    P.tailMid.rotation.x = 0.35 + Math.sin(t * 1.8) * 0.13;
+    P.head.rotation.y = Math.sin(t * 0.6) * 0.3;
+    if (PET.petT <= 0) { P.head.rotation.z = 0; setPetEyes(1); }
+  } else {
+    P.bodyG.rotation.x = 0;
+    var ry = avatar.rotation.y;
+    var tx = avatar.position.x - Math.sin(ry) * 0.95 + Math.cos(ry) * 0.5;
+    var tz = avatar.position.z - Math.cos(ry) * 0.95 - Math.sin(ry) * 0.5;
+    var dx = tx - g.position.x, dz = tz - g.position.z;
+    var dist = Math.hypot(dx, dz);
+    if (dist > 13) { g.position.set(tx, avatar.position.y, tz); dist = 0; meow(0.7); }
+    if (dist > 0.3) {
+      PET.idleT = 0; PET.sitting = false;
+      var sp = Math.min(5.4, Math.max(1.1, dist * 2.4));
+      var vx = dx / dist * sp, vz = dz / dist * sp;
+      g.position.x += vx * dt; g.position.z += vz * dt;
+      g.position.y = avatar.position.y;
+      var want = Math.atan2(vx, vz);
+      var df = want - g.rotation.y;
+      while (df > Math.PI) df -= Math.PI * 2;
+      while (df < -Math.PI) df += Math.PI * 2;
+      g.rotation.y += df * Math.min(1, dt * 9);
+      PET.phase += dt * (4 + sp * 2.2);
+      for (li = 0; li < 4; li++) P.legs[li].rotation.x = Math.sin(PET.phase + (li === 0 || li === 3 ? 0 : Math.PI)) * 0.55;
+      P.bodyG.position.y = 0.30 + Math.abs(Math.sin(PET.phase)) * 0.028;
+      P.tail.rotation.x = -0.95; P.tail.rotation.y = 0; P.tail.rotation.z = Math.sin(t * 2.6) * 0.16;
+      P.tailMid.rotation.x = -0.25 + Math.sin(t * 3.1) * 0.14;
+      P.head.rotation.y = 0;
+      if (PET.petT <= 0) P.head.rotation.z = 0;
+    } else {
+      PET.idleT += dt;
+      for (li = 0; li < 4; li++) P.legs[li].rotation.x *= 0.8;
+      P.bodyG.position.y = 0.30 + Math.sin(t * 1.7) * 0.006;
+      if (PET.idleT > 2.2) PET.sitting = true;
+      if (PET.sitting) {
+        P.bodyG.position.y = 0.235;
+        P.legs[2].rotation.x = 1.15; P.legs[3].rotation.x = 1.15;
+        P.legs[0].rotation.x = 0; P.legs[1].rotation.x = 0;
+        P.tail.rotation.x = -0.2; P.tail.rotation.z = 0; P.tail.rotation.y = 0.85;
+        P.tailMid.rotation.x = -0.5;
+        if (PET.petT <= 0) P.head.rotation.z = 0.07;
+      } else {
+        P.tail.rotation.x = -0.95; P.tail.rotation.y = 0;
+        P.tail.rotation.z = Math.sin(t * 2.2) * 0.14;
+        P.tailMid.rotation.x = -0.25 + Math.sin(t * 2.7) * 0.12;
+        if (PET.petT <= 0) P.head.rotation.z = 0;
+      }
+      var wa = Math.atan2(avatar.position.x - g.position.x, avatar.position.z - g.position.z);
+      var df2 = wa - g.rotation.y;
+      while (df2 > Math.PI) df2 -= Math.PI * 2;
+      while (df2 < -Math.PI) df2 += Math.PI * 2;
+      g.rotation.y += df2 * Math.min(1, dt * 3);
+    }
+    PET.earT -= dt;
+    if (PET.earT <= 0) { PET.earT = 2 + Math.random() * 4; PET.earFlick = 0.18; }
+    if (PET.earFlick > 0) { PET.earFlick -= dt; P.ears[1].rotation.z = -0.16 - 0.5 * Math.max(0, PET.earFlick); }
+    else P.ears[1].rotation.z = -0.16;
+    PET.meowT -= dt;
+    if (PET.meowT <= 0) { PET.meowT = 24 + Math.random() * 22; if (Math.random() < 0.75) meow(0.55); }
+  }
+  if (PET.petT > 0) {
+    PET.petT -= dt;
+    PET.heartT -= dt;
+    if (PET.heartT <= 0) { PET.heartT = 0.28; spawnHeart(g.position); }
+    P.head.rotation.z = Math.sin(t * 9) * 0.07;
+    setPetEyes(0.22);
+    if (PET.petT <= 0) { stopPurr(); setPetEyes(1); P.head.rotation.z = 0; }
+  }
+}
+var petUiAnchor = 0;
 /* ===== ALBUM KY NIEM + NGAY SINH / NGAY MAT + SINH NHAT TRUOC CUA ===== */
 function myUid() {
   if (!U.uid) {
@@ -4345,6 +4685,51 @@ function checkBirthdays(force) {
     toast("🎂 Hôm nay là sinh nhật của " + list.map(function(i) { return U.shrines[i].name; }).join(", ") + " — bé đang ở trước cửa miếu!");
   }
 }
+
+function openPetPanel() {
+  var sh = U.shrines[currentPos]; if (!sh) return;
+  petForIdx = currentPos;
+  petDraft = Object.assign({}, petCfgOf(sh));
+  document.getElementById("petModalName").textContent = sh.name;
+  renderPetOptions();
+  document.getElementById("petModal").style.display = "flex";
+  var own = isOwner(sh);
+  document.getElementById("petOpts").style.opacity = own ? "1" : "0.45";
+  document.getElementById("petOpts").style.pointerEvents = own ? "auto" : "none";
+  document.getElementById("petOwnerNote").style.display = own ? "none" : "block";
+  document.getElementById("petByeBtn").style.display = (PET && PET.idx === currentPos) ? "" : "none";
+}
+function closePetPanel() { document.getElementById("petModal").style.display = "none"; }
+function renderPetOptions() {
+  var fr = document.getElementById("petFurs"); fr.innerHTML = "";
+  PET_FURS.forEach(function(c) {
+    var b = document.createElement("button");
+    b.className = "pet-sw" + (petDraft.fur === c ? " sel" : "");
+    b.style.background = c;
+    b.onclick = function() { petDraft.fur = c; renderPetOptions(); };
+    fr.appendChild(b);
+  });
+  [["petPat", "pattern", [["tron", "Trơn"], ["van", "Vằn"], ["dom", "Đốm"]]],
+   ["petEye", "eye", [["#3f7a3a", "Mắt xanh lá"], ["#d9932c", "Mắt hổ phách"], ["#3a7bd4", "Mắt xanh dương"]]],
+   ["petAcc", "acc", [["chuong", "🔔 Chuông vàng"], ["no", "🎀 Nơ hồng"], ["vong", "💙 Vòng xanh"], ["khong", "Không"]]]].forEach(function(row) {
+    var el = document.getElementById(row[0]); el.innerHTML = "";
+    row[2].forEach(function(opt) {
+      var b = document.createElement("button");
+      b.className = "pet-opt" + (petDraft[row[1]] === opt[0] ? " sel" : "");
+      b.textContent = opt[1];
+      b.onclick = function() { petDraft[row[1]] = opt[0]; renderPetOptions(); };
+      el.appendChild(b);
+    });
+  });
+}
+function confirmPet() {
+  var sh = U.shrines[petForIdx]; if (!sh) return;
+  if (isOwner(sh)) { sh.pet = Object.assign({}, petDraft); persistShrine(petForIdx); }
+  closePetPanel();
+  closeDetail3D();
+  spawnPet(petForIdx);
+}
+function petBye() { closePetPanel(); despawnPet(); toast("🐱 Bé đã về ô của mình nghỉ ngơi rồi"); }
 
 function openDetail3D(idx) {
   currentPos = idx; removeArmed = false;
@@ -4779,6 +5164,7 @@ function removeShrine3D() {
   }
   var name = U.shrines[currentPos] ? U.shrines[currentPos].name : "";
   delete U.shrines[currentPos];
+  if (PET && PET.idx === currentPos) despawnPet();
   delete U.litDay[currentPos];
   delete U.incDay[currentPos];
   saveState();
