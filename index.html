@@ -3369,6 +3369,7 @@ function spawnRemoteChibi(id, e) {
 function disposeOther(o) {
   if (!o) return;
   scene.remove(o.grp);
+  if (o.pet) { scene.remove(o.pet.g); o.pet = null; }
   if (o.body) o.body.traverse(function(c) {
     if (c.isMesh) {
       if (c.geometry) c.geometry.dispose();
@@ -5305,17 +5306,85 @@ function pollFeed() {
   });
 }
 /* ---------- hien dien: vi tri + mau ao cua tung khach ---------- */
+function stepRemotePet(o, dt, t) {
+  var rp = o.pet; if (!rp) return;
+  var g = rp.g, P = rp.P, li;
+  g.visible = o.grp.visible;
+  if (!g.visible) return;
+  if (o.petMode === "carry") {
+    var ry = o.grp.rotation.y;
+    g.position.set(o.grp.position.x + Math.sin(ry) * 0.37, o.grp.position.y + 1.0 + Math.sin(t * 2.1 + rp.seed) * 0.015, o.grp.position.z + Math.cos(ry) * 0.37);
+    g.rotation.y = ry;
+    P.bodyG.position.y = 0.30; P.bodyG.rotation.x = -0.22;
+    for (li = 0; li < 4; li++) P.legs[li].rotation.x = (li < 2 ? 0.55 : 0.3) + Math.sin(t * 2.4 + li * 1.7 + rp.seed) * 0.07;
+    P.tail.rotation.x = 2.55; P.tail.rotation.y = 0; P.tail.rotation.z = 0;
+    P.tailMid.rotation.x = 0.35 + Math.sin(t * 1.8 + rp.seed) * 0.13;
+    rp.sitting = false; rp.idleT = 0;
+    return;
+  }
+  P.bodyG.rotation.x = 0;
+  var ry2 = o.grp.rotation.y;
+  var tx = o.grp.position.x - Math.sin(ry2) * 0.95 + Math.cos(ry2) * 0.5;
+  var tz = o.grp.position.z - Math.cos(ry2) * 0.95 - Math.sin(ry2) * 0.5;
+  var dx = tx - g.position.x, dz = tz - g.position.z;
+  var dist = Math.hypot(dx, dz);
+  if (dist > 13) { g.position.set(tx, 0, tz); dist = 0; }
+  if (dist > 0.3) {
+    rp.idleT = 0; rp.sitting = false;
+    var sp = Math.min(5.4, Math.max(1.1, dist * 2.4));
+    g.position.x += dx / dist * sp * dt;
+    g.position.z += dz / dist * sp * dt;
+    g.position.y += (0 - g.position.y) * Math.min(1, dt * 6);
+    var want = Math.atan2(dx / dist * sp, dz / dist * sp);
+    var df = want - g.rotation.y;
+    while (df > Math.PI) df -= Math.PI * 2;
+    while (df < -Math.PI) df += Math.PI * 2;
+    g.rotation.y += df * Math.min(1, dt * 9);
+    rp.phase += dt * (4 + sp * 2.2);
+    for (li = 0; li < 4; li++) P.legs[li].rotation.x = Math.sin(rp.phase + (li === 0 || li === 3 ? 0 : Math.PI)) * 0.55;
+    P.bodyG.position.y = 0.30 + Math.abs(Math.sin(rp.phase)) * 0.028;
+    P.tail.rotation.x = -0.95; P.tail.rotation.y = 0; P.tail.rotation.z = Math.sin(t * 2.6 + rp.seed) * 0.16;
+    P.tailMid.rotation.x = -0.25 + Math.sin(t * 3.1 + rp.seed) * 0.14;
+  } else {
+    rp.idleT += dt;
+    for (li = 0; li < 4; li++) P.legs[li].rotation.x *= 0.8;
+    if (rp.idleT > 2.2) rp.sitting = true;
+    if (rp.sitting) {
+      P.bodyG.position.y = 0.235;
+      P.legs[2].rotation.x = 1.15; P.legs[3].rotation.x = 1.15;
+      P.legs[0].rotation.x = 0; P.legs[1].rotation.x = 0;
+      P.tail.rotation.x = -0.2; P.tail.rotation.y = 0.85; P.tail.rotation.z = 0;
+      P.tailMid.rotation.x = -0.5;
+    } else {
+      P.bodyG.position.y = 0.30 + Math.sin(t * 1.7 + rp.seed) * 0.006;
+      P.tail.rotation.x = -0.95; P.tail.rotation.y = 0; P.tail.rotation.z = Math.sin(t * 2.2 + rp.seed) * 0.14;
+      P.tailMid.rotation.x = -0.25 + Math.sin(t * 2.7 + rp.seed) * 0.12;
+    }
+    var wa = Math.atan2(o.grp.position.x - g.position.x, o.grp.position.z - g.position.z);
+    var df3 = wa - g.rotation.y;
+    while (df3 > Math.PI) df3 -= Math.PI * 2;
+    while (df3 < -Math.PI) df3 += Math.PI * 2;
+    g.rotation.y += df3 * Math.min(1, dt * 3);
+  }
+}
 function sendPresence() {
   if (!avatar) return;
   var now = Date.now();
   var p = avatar.position, r = avatar.rotation.y;
   ensureSpotIds();
   var seatId = mySeatId();
-  var moved = Math.hypot(p.x - lastSentPos.x, p.z - lastSentPos.z) > 0.05 || Math.abs(r - lastSentPos.r) > 0.08 || seatId !== (window.__lastSeatSent || null);
+  var petInfo = null;
+  if (PET) {
+    var psh = U.shrines[PET.idx], pc = petCfgOf(psh);
+    petInfo = { n: psh ? psh.name : "Bé", f: pc.fur, p: pc.pattern, e: pc.eye, a: pc.acc, m: PET.mode };
+  }
+  var petKey = petInfo ? petInfo.n + "|" + petInfo.f + "|" + petInfo.p + "|" + petInfo.e + "|" + petInfo.a + "|" + petInfo.m : "";
+  var moved = Math.hypot(p.x - lastSentPos.x, p.z - lastSentPos.z) > 0.05 || Math.abs(r - lastSentPos.r) > 0.08 || seatId !== (window.__lastSeatSent || null) || petKey !== (window.__lastPetKey || "");
   if (!moved && now - lastPresenceSent < 12000) return;
   lastPresenceSent = now; lastSentPos = { x: p.x, z: p.z, r: r };
   window.__lastSeatSent = seatId;
-  dbPut("/presence/" + CLIENT_ID, { n: myName(), g: myGender(), x: +p.x.toFixed(2), z: +p.z.toFixed(2), r: +r.toFixed(2), c: myColors(), s: seatId, f: FLOOR, t: now });
+  window.__lastPetKey = petKey;
+  dbPut("/presence/" + CLIENT_ID, { n: myName(), g: myGender(), x: +p.x.toFixed(2), z: +p.z.toFixed(2), r: +r.toFixed(2), c: myColors(), s: seatId, f: FLOOR, t: now, pt: petInfo });
 }
 function makeOtherAvatar(name, c, g) {
   var grp = new THREE.Group();
@@ -5357,6 +5426,19 @@ function pollPresence() {
         }
         o.tx = e.x || 0; o.tz = e.z || 0; o.tr = e.r || 0;
         o.seatId = e.s || null;
+        if (e.pt && e.pt.n) {
+          var pk2 = e.pt.f + "|" + e.pt.p + "|" + e.pt.e + "|" + e.pt.a + "|" + e.pt.n;
+          o.petMode = e.pt.m || "follow";
+          if (!o.pet || o.pet.key !== pk2) {
+            if (o.pet) scene.remove(o.pet.g);
+            var pg = buildPetCat({ fur: e.pt.f, pattern: e.pt.p, eye: e.pt.e, acc: e.pt.a }, e.pt.n);
+            pg.position.set((e.x || 0) + 0.9, 0, (e.z || 0) + 0.9);
+            scene.add(pg);
+            o.pet = { g: pg, P: pg.userData.parts, key: pk2, phase: 0, idleT: 0, sitting: false, seed: Math.random() * 9 };
+          }
+        } else if (o.pet) {
+          scene.remove(o.pet.g); o.pet = null; o.petMode = null;
+        }
         if (e.s) { (claims[e.s] = claims[e.s] || []).push(id); }
         spawnQueue.push([id, e]);
         if (o.kind === "chibi" && o.body) {
@@ -5416,6 +5498,7 @@ function updateOthers(dt) {
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
     o.grp.rotation.y += diff * Math.min(1, dt * 6);
+    if (o.pet) stepRemotePet(o, dt, performance.now() * 0.001);
     if (o.kind !== "chibi" || !o.mixer || !visTop) { o.grp.position.y += (0 - o.grp.position.y) * Math.min(1, dt * 6); return; }
     ensureSpotIds();
     var spot = o.seatId ? SPOT_BY_ID[o.seatId] : null;
