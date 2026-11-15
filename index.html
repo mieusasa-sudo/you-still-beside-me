@@ -4331,9 +4331,10 @@ function loadCatModel(cb) {
   next();
 }
 var CAT_TEX_CACHE = {};
-function recolorCatTexture(img, variant) {
+function recolorCatTexture(img, variant, cache) {
+  cache = cache || CAT_TEX_CACHE;
   if (!img || !img.width) return null;
-  if (CAT_TEX_CACHE[variant]) return CAT_TEX_CACHE[variant];
+  if (cache[variant]) return cache[variant];
   try {
     var w = img.width, h = img.height;
     var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
@@ -4363,7 +4364,7 @@ function recolorCatTexture(img, variant) {
     var tex = new THREE.CanvasTexture(cv);
     tex.encoding = THREE.sRGBEncoding;
     tex.userData.cached = true;
-    CAT_TEX_CACHE[variant] = tex;
+    cache[variant] = tex;
     return tex;
   } catch (e) { return null; }
 }
@@ -4426,11 +4427,163 @@ function buildRealCat(cfg, name, done) {
             accG.add(bow); P.accParts.bow = bow;
           }
           var tag = makePetTag(name); tag.position.y = 0.86; g.add(tag);
+          P.tag = tag;
           g.userData.parts = P;
           done(g);
         } catch (e2) { done(null); }
       }, function() { done(null); });
     } catch (e) { done(null); }
+  });
+}
+/* ===== MODEL MEO CO ANIMATION NURONG SAN (Idle / Idle_Alert / Fetch — file moi cua Nhien) ===== */
+var CATB_TEX_CACHE = {};
+var CATB = { chunks: ["petanim-1.js", "petanim-2.js"], prefix: "__PANIM_B64_", buf: null, loading: false, cbs: [] };
+function loadCatAnim(cb) {
+  if (CATB.buf) { if (cb) cb(true); return; }
+  if (cb) CATB.cbs.push(cb);
+  if (CATB.loading) return;
+  CATB.loading = true;
+  var i = 0;
+  function flushB(ok) { var c = CATB.cbs; CATB.cbs = []; for (var j = 0; j < c.length; j++) c[j](ok); }
+  function decodeB() {
+    try {
+      var b64 = "";
+      for (var k = 1; k <= CATB.chunks.length; k++) b64 += window[CATB.prefix + k] || "";
+      var bin = atob(b64); var bytes = new Uint8Array(bin.length);
+      for (var bi = 0; bi < bin.length; bi++) bytes[bi] = bin.charCodeAt(bi);
+      CATB.buf = bytes.buffer; CATB.loading = false; flushB(true);
+    } catch (e) { CATB.loading = false; flushB(false); }
+  }
+  function next() {
+    if (i >= CATB.chunks.length) { decodeB(); return; }
+    var sc = document.createElement("script");
+    sc.src = CATB.chunks[i]; i++;
+    sc.onload = next;
+    sc.onerror = function() { CATB.loading = false; flushB(false); };
+    document.head.appendChild(sc);
+  }
+  next();
+}
+function buildPetAccInto(accG, cfg, parts) {
+  var acc = cfg.acc || "chuong";
+  if (acc === "chuong" || acc === "vong") {
+    var collar = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.0145, 8, 22), new THREE.MeshStandardMaterial({ color: acc === "chuong" ? 0xd43d4f : 0x3d7ad4, roughness: 0.5 }));
+    collar.rotation.x = 0.55; accG.add(collar); parts.collar = collar;
+    if (acc === "chuong") {
+      var bell = new THREE.Mesh(new THREE.SphereGeometry(0.021, 10, 10), new THREE.MeshStandardMaterial({ color: 0xe9c46a, metalness: 0.75, roughness: 0.3 }));
+      accG.add(bell); parts.bell = bell;
+    }
+  } else if (acc === "no") {
+    var bow = new THREE.Group();
+    var bm = new THREE.MeshStandardMaterial({ color: 0xf27ba7, roughness: 0.6 });
+    [-1, 1].forEach(function(sd) { var cn = new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.058, 6), bm); cn.rotation.z = sd * 1.85; cn.position.x = sd * 0.031; bow.add(cn); });
+    bow.add(new THREE.Mesh(new THREE.SphereGeometry(0.017, 8, 8), bm));
+    accG.add(bow); parts.bow = bow;
+  }
+}
+function buildBakedCat(cfg, name, done) {
+  loadCatAnim(function(ok) {
+    if (!ok || !CATB.buf) { done(null); return; }
+    try {
+      new THREE.GLTFLoader().parse(CATB.buf.slice(0), "", function(gltf) {
+        try {
+          var inner = gltf.scene;
+          var box = new THREE.Box3().setFromObject(inner);
+          var size = box.getSize(new THREE.Vector3());
+          var s = 0.66 / Math.max(size.y, 0.001);
+          var wrap = new THREE.Group();
+          wrap.scale.setScalar(s);
+          wrap.position.y = -box.min.y * s;
+          wrap.add(inner);
+          var g = new THREE.Group(); g.add(wrap);
+          var B = {};
+          inner.traverse(function(c) { if (c.isBone) B[c.name] = c; if (c.isMesh) c.frustumCulled = false; });
+          inner.updateMatrixWorld(true);
+          if (B["Head"] && B["Tail_Base"]) {
+            var hv = new THREE.Vector3(), tv = new THREE.Vector3();
+            B["Head"].getWorldPosition(hv); B["Tail_Base"].getWorldPosition(tv);
+            if (hv.z < tv.z) wrap.rotation.y = Math.PI;
+          }
+          var variant = cfg.variant || "cam";
+          if (variant !== "cam") {
+            inner.traverse(function(c) {
+              if (c.isMesh && c.material && c.material.map) {
+                var nt = recolorCatTexture(c.material.map.image, variant, CATB_TEX_CACHE);
+                if (nt) { c.material = c.material.clone(); c.material.map = nt; c.material.needsUpdate = true; }
+              }
+            });
+          }
+          var mixer = new THREE.AnimationMixer(inner);
+          var acts = {};
+          (gltf.animations || []).forEach(function(c) { var a = mixer.clipAction(c); a.enabled = false; acts[c.name] = a; });
+          var P2 = { wrap: wrap, groundY: -box.min.y * s, B: B, mixer: mixer, acts: acts, cur: null, accParts: {} };
+          var accG = new THREE.Group(); g.add(accG); P2.accG = accG;
+          buildPetAccInto(accG, cfg, P2.accParts);
+          var tag = makePetTag(name); tag.position.y = 0.86; g.add(tag); P2.tag = tag;
+          g.userData.baked = P2;
+          done(g);
+        } catch (e2) { done(null); }
+      }, function() { done(null); });
+    } catch (e) { done(null); }
+  });
+}
+var _bpv = null;
+function petClipStep(st, dt, wantClip) {
+  var P = st.P; if (!P || !P.baked || !P.bakedG) return;
+  var B = P.baked;
+  if (wantClip && B.acts[wantClip]) {
+    P.bakedG.visible = true;
+    P.wrap.visible = false;
+    if (P.accG) P.accG.visible = false;
+    if (P.tag) P.tag.visible = false;
+    if (B.cur !== wantClip) {
+      if (B.cur && B.acts[B.cur]) B.acts[B.cur].fadeOut(0.15);
+      var a = B.acts[wantClip]; a.enabled = true; a.reset().fadeIn(0.15).play();
+      B.cur = wantClip;
+    }
+    B.mixer.update(dt);
+    if (B.accG && (B.accParts.collar || B.accParts.bow)) {
+      if (!_bpv) _bpv = new THREE.Vector3();
+      st.g.updateMatrixWorld(true);
+      if (B.accParts.collar && B.B["Spine_4"]) {
+        B.B["Spine_4"].getWorldPosition(_bpv);
+        var cp = P.bakedG.worldToLocal(_bpv.clone());
+        B.accParts.collar.position.copy(cp);
+        if (B.accParts.bell) B.accParts.bell.position.set(cp.x, cp.y - 0.052, cp.z + 0.038);
+      }
+      if (B.accParts.bow && B.B["Head"]) {
+        B.B["Head"].getWorldPosition(_bpv);
+        var hp = P.bakedG.worldToLocal(_bpv.clone());
+        B.accParts.bow.position.set(hp.x + 0.052, hp.y + 0.088, hp.z - 0.01);
+      }
+    }
+  } else {
+    if (P.bakedG.visible) P.bakedG.visible = false;
+    if (B.cur) { if (B.acts[B.cur]) B.acts[B.cur].stop(); B.cur = null; }
+    if (!P.wrap.visible) P.wrap.visible = true;
+    if (P.accG && !P.accG.visible) P.accG.visible = true;
+    if (P.tag && !P.tag.visible) P.tag.visible = true;
+  }
+}
+function attachBakedLocal() {
+  if (!PET || !PET.P || !PET.P.real || PET.P.baked) return;
+  var myPet = PET, sh = U.shrines[PET.idx]; if (!sh) return;
+  buildBakedCat(petCfgOf(sh), sh.name, function(bg) {
+    if (!bg) return;
+    if (PET !== myPet || !PET.P || PET.P.baked) { disposeRealCat(bg); return; }
+    bg.visible = false;
+    PET.g.add(bg);
+    PET.P.baked = bg.userData.baked; PET.P.bakedG = bg;
+  });
+}
+function attachBakedRemote(o) {
+  var rp = o.pet; if (!rp || !rp.P || !rp.P.real || rp.P.baked || !o.petCfg) return;
+  buildBakedCat(o.petCfg, o.petName || "Bé", function(bg) {
+    if (!bg) return;
+    if (o.pet !== rp || !rp.P || rp.P.baked) { disposeRealCat(bg); return; }
+    bg.visible = false;
+    rp.g.add(bg);
+    rp.P.baked = bg.userData.baked; rp.P.bakedG = bg;
   });
 }
 var _pe = null, _pq = null, _pv = null;
@@ -4553,7 +4706,7 @@ function updateRealPet(dt, t) {
       tx = avatar.position.x + Math.sin(PET.rubAng) * 0.47;
       tz = avatar.position.z + Math.cos(PET.rubAng) * 0.47;
       speedCap = 1.7;
-    } else if (beh === "lick" || beh === "lie") stationary = true;
+    } else if (beh === "lick" || beh === "lie" || beh === "alert" || beh === "fetch") stationary = true;
     var dx = tx - g.position.x, dz = tz - g.position.z;
     var dist = Math.hypot(dx, dz);
     if (dist > 13 && beh === "none") { g.position.set(fx, avatar.position.y, fz); dist = 0; meow(0.7); }
@@ -4582,8 +4735,8 @@ function updateRealPet(dt, t) {
           PET.nextBeh -= dt;
           if (PET.nextBeh <= 0) {
             var rv = Math.random();
-            PET.beh = rv < 0.45 ? "rub" : (rv < 0.75 ? "lick" : "lie");
-            PET.behT = PET.beh === "rub" ? 5.5 : (PET.beh === "lick" ? 7 : 10 + Math.random() * 5);
+            PET.beh = rv < 0.30 ? "rub" : (rv < 0.50 ? "lick" : (rv < 0.70 ? "lie" : (rv < 0.85 ? "alert" : "fetch")));
+            PET.behT = PET.beh === "rub" ? 5.5 : (PET.beh === "lick" ? 7 : (PET.beh === "lie" ? 10 + Math.random() * 5 : (PET.beh === "alert" ? 3.4 : 2.6)));
             if (PET.beh === "rub") PET.rubAng = Math.atan2(g.position.x - avatar.position.x, g.position.z - avatar.position.z);
             beh = PET.beh;
           }
@@ -4591,7 +4744,7 @@ function updateRealPet(dt, t) {
       }
     }
     PET.moving01 = moving;
-    var sitT = beh === "lick" ? 1 : (beh === "none" && PET.idleT > 2.2 && moving === 0 ? 1 : 0);
+    var sitT = beh === "lick" ? 1 : (beh === "none" && PET.idleT > 5.0 && moving === 0 ? 1 : 0);
     PET.sitA = petEase(PET.sitA, sitT, 5, dt);
     PET.lieA = petEase(PET.lieA, beh === "lie" ? 1 : 0, 3.2, dt);
     PET.rubA = petEase(PET.rubA, beh === "rub" && Math.hypot(avatar.position.x - g.position.x, avatar.position.z - g.position.z) < 0.95 ? 1 : 0, 5, dt);
@@ -4602,6 +4755,13 @@ function updateRealPet(dt, t) {
     PET.meowT -= dt;
     if (PET.meowT <= 0) { PET.meowT = 24 + Math.random() * 22; if (Math.random() < 0.75) meow(0.55); }
   }
+  var wantClip = null;
+  if (PET.mode !== "carry" && PET.P.baked) {
+    if (PET.beh === "alert") wantClip = "Idle_Alert";
+    else if (PET.beh === "fetch") wantClip = "Fetch";
+    else if ((PET.moving01 || 0) < 0.05 && (PET.sitA || 0) < 0.4 && (PET.lieA || 0) < 0.4 && (PET.lickA || 0) < 0.4 && (PET.rubA || 0) < 0.4 && PET.petT <= 0) wantClip = "Idle";
+  }
+  petClipStep(PET, dt, wantClip);
   if (PET.petT > 0) {
     PET.petT -= dt;
     PET.heartT -= dt;
@@ -4621,10 +4781,11 @@ function stepRealRemotePet(o, dt, t) {
     rp.moving01 = 0; rp.beh = "none";
     rp.sitA = petEase(rp.sitA, 0, 6, dt); rp.lieA = petEase(rp.lieA, 0, 6, dt); rp.rubA = petEase(rp.rubA, 0, 6, dt); rp.lickA = petEase(rp.lickA, 0, 6, dt);
     poseRealCat(rp, dt, t);
+    petClipStep(rp, dt, null);
     return;
   }
   rp.P.wrap.rotation.x = 0;
-  var beh = o.petBeh === 1 ? "rub" : (o.petBeh === 2 ? "lick" : (o.petBeh === 3 ? "lie" : "none"));
+  var beh = o.petBeh === 1 ? "rub" : (o.petBeh === 2 ? "lick" : (o.petBeh === 3 ? "lie" : (o.petBeh === 4 ? "alert" : (o.petBeh === 5 ? "fetch" : "none"))));
   rp.beh = beh;
   var ry2 = o.grp.rotation.y;
   var tx = o.grp.position.x - Math.sin(ry2) * 0.95 + Math.cos(ry2) * 0.5;
@@ -4636,7 +4797,7 @@ function stepRealRemotePet(o, dt, t) {
     tx = o.grp.position.x + Math.sin(rp.rubAng) * 0.47;
     tz = o.grp.position.z + Math.cos(rp.rubAng) * 0.47;
     speedCap = 1.7;
-  } else if (beh === "lick" || beh === "lie") stationary = true;
+  } else if (beh === "lick" || beh === "lie" || beh === "alert" || beh === "fetch") stationary = true;
   var dx = tx - g.position.x, dz = tz - g.position.z;
   var dist = Math.hypot(dx, dz);
   if (dist > 13) { g.position.set(tx, 0, tz); dist = 0; }
@@ -4662,7 +4823,7 @@ function stepRealRemotePet(o, dt, t) {
     g.rotation.y += df3 * Math.min(1, dt * 3);
   }
   rp.moving01 = moving;
-  var sitT = beh === "lick" ? 1 : (beh === "none" && rp.idleT > 2.2 && moving === 0 ? 1 : 0);
+  var sitT = beh === "lick" ? 1 : (beh === "none" && rp.idleT > 5.0 && moving === 0 ? 1 : 0);
   rp.sitA = petEase(rp.sitA, sitT, 5, dt);
   rp.lieA = petEase(rp.lieA, beh === "lie" ? 1 : 0, 3.2, dt);
   rp.rubA = petEase(rp.rubA, beh === "rub" && Math.hypot(o.grp.position.x - g.position.x, o.grp.position.z - g.position.z) < 0.95 ? 1 : 0, 5, dt);
@@ -4670,6 +4831,13 @@ function stepRealRemotePet(o, dt, t) {
   rp.sleepA = petEase(rp.sleepA, beh === "lie" ? 0.7 : 0, 1.5, dt);
   rp.lickOn = beh === "lick" ? ((t % 3.2) < 2.1) : false;
   poseRealCat(rp, dt, t);
+  var wantClipR = null;
+  if (rp.P && rp.P.baked) {
+    if (beh === "alert") wantClipR = "Idle_Alert";
+    else if (beh === "fetch") wantClipR = "Fetch";
+    else if ((rp.moving01 || 0) < 0.05 && (rp.sitA || 0) < 0.4 && (rp.lieA || 0) < 0.4 && (rp.lickA || 0) < 0.4 && (rp.rubA || 0) < 0.4) wantClipR = "Idle";
+  }
+  petClipStep(rp, dt, wantClipR);
 }
 function initRealState(st) {
   st.sitA = 0; st.lieA = 0; st.rubA = 0; st.lickA = 0; st.sleepA = 0; st.moving01 = 0; st.beh = "none"; st.behT = 0; st.lickOn = false;
@@ -4688,6 +4856,7 @@ function upgradePetToReal() {
     PET.g = ng; PET.P = ng.userData.parts;
     initRealState(PET);
     PET.nextBeh = 9 + Math.random() * 10; PET.rubAng = undefined;
+    attachBakedLocal();
   });
 }
 function upgradeRemotePet(o) {
@@ -4699,9 +4868,10 @@ function upgradeRemotePet(o) {
     scene.remove(rp.g); scene.add(ng);
     rp.g = ng; rp.P = ng.userData.parts;
     initRealState(rp);
+    attachBakedRemote(o);
   });
 }
-setTimeout(function() { loadCatModel(); loadCatSfx(); }, 3500);
+setTimeout(function() { loadCatModel(); loadCatSfx(); loadCatAnim(); }, 3500);
 
 function spawnPet(idx) {
   var sh = U.shrines[idx]; if (!sh) return;
@@ -5806,7 +5976,7 @@ function sendPresence() {
   var petInfo = null;
   if (PET) {
     var psh = U.shrines[PET.idx], pc = petCfgOf(psh);
-    petInfo = { n: psh ? psh.name : "Bé", f: pc.fur, p: pc.pattern, e: pc.eye, a: pc.acc, m: PET.mode, v: pc.variant || "cam", r: PET.P && PET.P.real ? 1 : 0, b: PET.beh === "rub" ? 1 : (PET.beh === "lick" ? 2 : (PET.beh === "lie" ? 3 : 0)) };
+    petInfo = { n: psh ? psh.name : "Bé", f: pc.fur, p: pc.pattern, e: pc.eye, a: pc.acc, m: PET.mode, v: pc.variant || "cam", r: PET.P && PET.P.real ? 1 : 0, b: PET.beh === "rub" ? 1 : (PET.beh === "lick" ? 2 : (PET.beh === "lie" ? 3 : (PET.beh === "alert" ? 4 : (PET.beh === "fetch" ? 5 : 0)))) };
   }
   var petKey = petInfo ? petInfo.n + "|" + petInfo.f + "|" + petInfo.p + "|" + petInfo.e + "|" + petInfo.a + "|" + petInfo.m + "|" + petInfo.v + "|" + petInfo.r + "|" + petInfo.b : "";
   var moved = Math.hypot(p.x - lastSentPos.x, p.z - lastSentPos.z) > 0.05 || Math.abs(r - lastSentPos.r) > 0.08 || seatId !== (window.__lastSeatSent || null) || petKey !== (window.__lastPetKey || "");
