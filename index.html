@@ -348,19 +348,25 @@ window.__gmLoadSdk = function (cb) {
     </div>
     <h4>📸 Album kỷ niệm <span id="albumCount"></span></h4>
     <div id="albumGrid" class="album-grid"></div>
-    <button class="alb-add" onclick="document.getElementById('albumInput').click()">＋ Thêm ảnh vào album</button>
+    <button class="alb-add" id="albumAddBtn" onclick="document.getElementById('albumInput').click()">＋ Thêm ảnh vào album</button>
     <input type="file" id="albumInput" accept="image/*" multiple style="display:none">
-    <div class="f-row">
-      <div><label class="f-label">🎂 Ngày sinh</label><input class="f-input" id="petBirth" type="date"></div>
-      <div><label class="f-label">🕊️ Ngày mất</label><input class="f-input" id="petDeath" type="date"></div>
+    <div id="ownerZone">
+      <label class="f-label">✏️ Tên của bé</label>
+      <input class="f-input" id="petName" maxlength="24">
+      <div class="f-row">
+        <div><label class="f-label">🎂 Ngày sinh</label><input class="f-input" id="petBirth" type="date"></div>
+        <div><label class="f-label">🕊️ Ngày mất</label><input class="f-input" id="petDeath" type="date"></div>
+      </div>
+      <button class="alb-add" onclick="savePetInfo()">💾 Lưu thông tin của bé</button>
     </div>
-    <button class="alb-add" onclick="savePetDates()">💾 Lưu ngày tháng</button>
+    <p id="ownerLock" class="alb-empty" style="display:none">🔒 Chỉ chủ của bé mới thêm ảnh vào album, đổi tên và sửa ngày tháng được.</p>
+    <button id="claimBtn" class="alb-add" style="display:none" onclick="claimShrine()">🙋 Đây là bé của tôi — nhận quyền chủ bé</button>
     <div id="albumView">
       <img id="albumImg" alt="">
       <div class="alb-nav"><button onclick="albumNav(-1)">‹</button><span id="albumIdx"></span><button onclick="albumNav(1)">›</button></div>
       <div class="alb-view-btns">
-        <button onclick="albumSetMain()">⭐ Đặt làm ảnh chính</button>
-        <button onclick="albumDelete()">🗑️ Xóa ảnh</button>
+        <button id="albMainBtn" onclick="albumSetMain()">⭐ Đặt làm ảnh chính</button>
+        <button id="albDelBtn" onclick="albumDelete()">🗑️ Xóa ảnh</button>
         <button onclick="albumClose()">Đóng</button>
       </div>
     </div>
@@ -3731,7 +3737,7 @@ function createShrine3D() {
   var st = document.getElementById("newSpecialType").value;
   var sd = document.getElementById("newSpecialDay").value.trim();
   U.shrines[addPos] = {
-    name: name, kind: selectedKind,
+    name: name, kind: selectedKind, owner: myUid(),
     years: document.getElementById("newYears").value.trim() || "—",
     msg: document.getElementById("newMsg").value.trim() || "Một gian tưởng niệm mới, chờ những lời thương nhớ.",
     special: st ? (st + (sd ? " · " + sd : "")) : "",
@@ -4147,6 +4153,34 @@ function renderVisitList() {
 }
 
 /* ===== ALBUM KY NIEM + NGAY SINH / NGAY MAT + SINH NHAT TRUOC CUA ===== */
+function myUid() {
+  if (!U.uid) {
+    U.uid = "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+    saveState();
+  }
+  return U.uid;
+}
+function isOwner(sh) { return !!sh && !!sh.owner && sh.owner === myUid(); }
+function renderOwnerZone() {
+  var sh = U.shrines[currentPos]; if (!sh) return;
+  var own = isOwner(sh);
+  document.getElementById("ownerZone").style.display = own ? "block" : "none";
+  document.getElementById("albumAddBtn").style.display = own ? "" : "none";
+  document.getElementById("ownerLock").style.display = own ? "none" : "block";
+  document.getElementById("claimBtn").style.display = sh.owner ? "none" : "";
+  var db = document.querySelector("#detailPanel .danger");
+  if (db) db.style.display = own ? "" : "none";
+  var mb = document.getElementById("albMainBtn"), dl = document.getElementById("albDelBtn");
+  if (mb) mb.style.display = own ? "" : "none";
+  if (dl) dl.style.display = own ? "" : "none";
+}
+function claimShrine() {
+  var sh = U.shrines[currentPos]; if (!sh || sh.owner) return;
+  sh.owner = myUid();
+  persistShrine(currentPos);
+  renderOwnerZone();
+  toast("Đã nhận " + sh.name + " là bé của bạn 🐾 Từ giờ chỉ bạn mới sửa được bé.");
+}
 function fmtDate(iso) { var p = (iso || "").split("-"); return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : (iso || ""); }
 function vnTodayMD() {
   var n = new Date();
@@ -4185,6 +4219,8 @@ function renderAlbum() {
   if (!alb.length) grid.innerHTML = '<p class="alb-empty">Chưa có ảnh nào — thêm ảnh kỷ niệm của bé nhé 📷</p>';
   document.getElementById("petBirth").value = sh.birth || "";
   document.getElementById("petDeath").value = sh.death || "";
+  document.getElementById("petName").value = sh.name || "";
+  renderOwnerZone();
 }
 function albumOpen(i) { albumViewIdx = i; albumShow(); document.getElementById("albumView").style.display = "flex"; }
 function albumShow() {
@@ -4199,6 +4235,7 @@ function albumNav(d) { albumViewIdx += d; albumShow(); }
 function albumClose() { document.getElementById("albumView").style.display = "none"; }
 function albumSetMain() {
   var sh = U.shrines[currentPos]; if (!sh) return;
+  if (!isOwner(sh)) { toast("Chỉ chủ của bé mới sửa album được 🔒"); return; }
   var alb = albumOf(sh).slice();
   var it = alb.splice(albumViewIdx, 1)[0]; alb.unshift(it);
   sh.photos = alb; sh.photo = alb[0]; albumViewIdx = 0;
@@ -4207,24 +4244,31 @@ function albumSetMain() {
 }
 function albumDelete() {
   var sh = U.shrines[currentPos]; if (!sh) return;
+  if (!isOwner(sh)) { toast("Chỉ chủ của bé mới sửa album được 🔒"); return; }
   var alb = albumOf(sh).slice();
   alb.splice(albumViewIdx, 1);
   sh.photos = alb; sh.photo = alb[0] || null;
   albumShow(); renderAlbum(); persistShrine(currentPos); refreshCell(currentPos); if (boxR) refreshBox();
 }
-function savePetDates() {
+function savePetInfo() {
   var sh = U.shrines[currentPos]; if (!sh) return;
+  if (!isOwner(sh)) { toast("Chỉ chủ của bé mới sửa thông tin được 🔒"); return; }
+  var nm = document.getElementById("petName").value.trim();
+  if (nm) sh.name = nm;
   sh.birth = document.getElementById("petBirth").value || "";
   sh.death = document.getElementById("petDeath").value || "";
   persistShrine(currentPos);
   renderDetailMeta(sh);
+  refreshCell(currentPos);
+  if (boxR) refreshBox();
   checkBirthdays(true);
-  toast("Đã lưu ngày tháng cho " + sh.name + " 💾");
+  toast("Đã lưu thông tin cho " + sh.name + " 💾");
 }
 document.getElementById("albumInput").addEventListener("change", function(ev) {
   var files = ev.target.files;
   if (!files || !files.length) return;
   var sh = U.shrines[currentPos]; if (!sh) return;
+  if (!isOwner(sh)) { toast("Chỉ chủ của bé mới thêm ảnh vào album được 🔒"); ev.target.value = ""; return; }
   var alb = albumOf(sh).slice();
   var i = 0;
   function next() {
@@ -4726,6 +4770,7 @@ function actGuestbook() {
   toast("Đã viết vào sổ lưu niệm");
 }
 function removeShrine3D() {
+  if (!isOwner(U.shrines[currentPos])) { toast("Chỉ chủ của bé mới thu hồi được ô này 🔒"); return; }
   var btn = document.querySelector("#detailPanel .danger");
   if (!removeArmed) {
     removeArmed = true;
