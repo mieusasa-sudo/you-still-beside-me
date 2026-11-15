@@ -298,7 +298,9 @@ window.__gmLoadSdk = function (cb) {
       <h3>🐱 Gặp lại <span id="petModalName"></span></h3>
       <p class="modal-sub">Chọn màu lông và phụ kiện cho bé — bé sẽ xuất hiện, kêu meo meo và đi theo bạn khắp khuôn viên miếu.</p>
       <div id="petOpts">
-        <label class="f-label">Màu lông</label>
+        <label class="f-label">Màu lông (model mèo 3D)</label>
+        <div class="pet-row" id="petVars"></div>
+        <label class="f-label">Màu lông (bản dự phòng)</label>
         <div class="pet-row" id="petFurs"></div>
         <label class="f-label">Họa tiết</label>
         <div class="pet-row" id="petPat"></div>
@@ -3374,7 +3376,7 @@ function spawnRemoteChibi(id, e) {
 function disposeOther(o) {
   if (!o) return;
   scene.remove(o.grp);
-  if (o.pet) { scene.remove(o.pet.g); o.pet = null; }
+  if (o.pet) { scene.remove(o.pet.g); if (o.pet.P && o.pet.P.real) disposeRealCat(o.pet.g); o.pet = null; }
   if (o.body) o.body.traverse(function(c) {
     if (c.isMesh) {
       if (c.geometry) c.geometry.dispose();
@@ -4200,7 +4202,14 @@ function renderVisitList() {
 var PET = null, PET_HEARTS = [], PURR = null, HEART_TEX = null;
 var PET_FURS = ["#f5f0e6", "#3b3230", "#e8913a", "#9c6b4f", "#b8b4ae", "#f2c14e", "#7a4a2b", "#e8b4c8"];
 var petDraft = null, petForIdx = null;
-function petCfgOf(sh) { return (sh && sh.pet) || { fur: "#e8913a", pattern: "tron", eye: "#3f7a3a", acc: "chuong" }; }
+function petCfgOf(sh) { return (sh && sh.pet) || { fur: "#e8913a", pattern: "tron", eye: "#3f7a3a", acc: "chuong", variant: "cam" }; }
+var PET_VARIANTS = [
+  ["cam", "🧡 Cam vằn", "#e8913a", { fur: "#e8913a", pattern: "van" }],
+  ["den", "⚫ Đen", "#26221f", { fur: "#3b3230", pattern: "tron" }],
+  ["dentrang", "🐄 Đen trắng", "linear-gradient(135deg,#26221f 55%,#f5f0e6 45%)", { fur: "#3b3230", pattern: "dom" }],
+  ["trang", "⚪ Trắng", "#f7f3ec", { fur: "#f5f0e6", pattern: "tron" }],
+  ["nau", "🟤 Nâu", "#8a5a33", { fur: "#9c6b4f", pattern: "van" }]
+];
 function petFurTexture(cfg) {
   var cv = document.createElement("canvas"); cv.width = cv.height = 128;
   var g = cv.getContext("2d");
@@ -4292,6 +4301,404 @@ function buildPetCat(cfg, name) {
   g.userData.parts = P;
   return g;
 }
+
+/* ===== MODEL MEO THAT (file cua Nien) + ANIMATION BANG XUONG ===== */
+var CATM = { chunks: ["pet-model-1.js", "pet-model-2.js"], prefix: "__PET_B64_", buf: null, loading: false, cbs: [] };
+function loadCatModel(cb) {
+  if (CATM.buf) { if (cb) cb(true); return; }
+  if (cb) CATM.cbs.push(cb);
+  if (CATM.loading) return;
+  CATM.loading = true;
+  var i = 0;
+  function flushCat(ok) { var c = CATM.cbs; CATM.cbs = []; for (var j = 0; j < c.length; j++) c[j](ok); }
+  function decodeCat() {
+    try {
+      var b64 = "";
+      for (var k = 1; k <= CATM.chunks.length; k++) b64 += window[CATM.prefix + k] || "";
+      var bin = atob(b64); var bytes = new Uint8Array(bin.length);
+      for (var bi = 0; bi < bin.length; bi++) bytes[bi] = bin.charCodeAt(bi);
+      CATM.buf = bytes.buffer; CATM.loading = false; flushCat(true);
+    } catch (e) { CATM.loading = false; flushCat(false); }
+  }
+  function next() {
+    if (i >= CATM.chunks.length) { decodeCat(); return; }
+    var sc = document.createElement("script");
+    sc.src = CATM.chunks[i]; i++;
+    sc.onload = next;
+    sc.onerror = function() { CATM.loading = false; flushCat(false); };
+    document.head.appendChild(sc);
+  }
+  next();
+}
+var CAT_TEX_CACHE = {};
+function recolorCatTexture(img, variant) {
+  if (!img || !img.width) return null;
+  if (CAT_TEX_CACHE[variant]) return CAT_TEX_CACHE[variant];
+  try {
+    var w = img.width, h = img.height;
+    var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+    var ctx = cv.getContext("2d"); ctx.drawImage(img, 0, 0);
+    var idd = ctx.getImageData(0, 0, w, h), d = idd.data;
+    for (var i = 0; i < d.length; i += 4) {
+      var r = d[i], gg = d[i + 1], b = d[i + 2];
+      var mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+      var L = (0.2126 * r + 0.7152 * gg + 0.0722 * b) / 255;
+      var sat = mx > 0 ? (mx - mn) / mx : 0;
+      var whitePart = L > 0.76 && sat < 0.34;
+      if (variant === "trang") {
+        var v = (0.79 + L * 0.21) * 255;
+        d[i] = v; d[i + 1] = v * 0.99; d[i + 2] = v * 0.95;
+      } else if (variant === "den") {
+        var v2 = (0.03 + L * 0.21) * 255;
+        d[i] = v2 * 0.97; d[i + 1] = v2; d[i + 2] = v2 * 1.07;
+      } else if (variant === "dentrang") {
+        if (whitePart) { var v3 = (0.87 + L * 0.13) * 255; d[i] = v3; d[i + 1] = v3 * 0.99; d[i + 2] = v3 * 0.96; }
+        else { var v4 = (0.03 + L * 0.21) * 255; d[i] = v4 * 0.97; d[i + 1] = v4; d[i + 2] = v4 * 1.07; }
+      } else if (variant === "nau") {
+        if (whitePart) { var k = 0.85 + L * 0.15; d[i] = 246 * k; d[i + 1] = 231 * k; d[i + 2] = 205 * k; }
+        else { d[i] = r * 0.58; d[i + 1] = gg * 0.40; d[i + 2] = b * 0.27; }
+      }
+    }
+    ctx.putImageData(idd, 0, 0);
+    var tex = new THREE.CanvasTexture(cv);
+    tex.encoding = THREE.sRGBEncoding;
+    tex.userData.cached = true;
+    CAT_TEX_CACHE[variant] = tex;
+    return tex;
+  } catch (e) { return null; }
+}
+function disposeRealCat(g) {
+  if (!g) return;
+  g.traverse(function(c) {
+    if (c.isMesh || c.isSkinnedMesh) {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) {
+        if (c.material.map && !c.material.map.userData.cached) c.material.map.dispose();
+        if (c.material.dispose) c.material.dispose();
+      }
+    }
+  });
+}
+function buildRealCat(cfg, name, done) {
+  loadCatModel(function(ok) {
+    if (!ok || !CATM.buf) { done(null); return; }
+    try {
+      new THREE.GLTFLoader().parse(CATM.buf.slice(0), "", function(gltf) {
+        try {
+          var inner = gltf.scene;
+          var box = new THREE.Box3().setFromObject(inner);
+          var size = box.getSize(new THREE.Vector3());
+          var s = 0.58 / Math.max(size.y, 0.001);
+          var wrap = new THREE.Group();
+          wrap.scale.setScalar(s);
+          wrap.position.y = -box.min.y * s;
+          wrap.add(inner);
+          var g = new THREE.Group(); g.add(wrap);
+          var B = {}, rest = {};
+          inner.traverse(function(c) {
+            if (c.isBone) { B[c.name] = c; rest[c.name] = c.quaternion.clone(); }
+            if (c.isMesh) c.frustumCulled = false;
+          });
+          var variant = cfg.variant || "cam";
+          if (variant !== "cam") {
+            inner.traverse(function(c) {
+              if (c.isMesh && c.material && c.material.map) {
+                var nt = recolorCatTexture(c.material.map.image, variant);
+                if (nt) { c.material = c.material.clone(); c.material.map = nt; c.material.needsUpdate = true; }
+              }
+            });
+          }
+          var P = { real: true, wrap: wrap, groundY: -box.min.y * s, B: B, rest: rest, eyes: [], accParts: {} };
+          var accG = new THREE.Group(); g.add(accG); P.accG = accG;
+          var acc = cfg.acc || "chuong";
+          if (acc === "chuong" || acc === "vong") {
+            var collar = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.0145, 8, 22), new THREE.MeshStandardMaterial({ color: acc === "chuong" ? 0xd43d4f : 0x3d7ad4, roughness: 0.5 }));
+            collar.rotation.x = 0.55; accG.add(collar); P.accParts.collar = collar;
+            if (acc === "chuong") {
+              var bell = new THREE.Mesh(new THREE.SphereGeometry(0.021, 10, 10), new THREE.MeshStandardMaterial({ color: 0xe9c46a, metalness: 0.75, roughness: 0.3 }));
+              accG.add(bell); P.accParts.bell = bell;
+            }
+          } else if (acc === "no") {
+            var bow = new THREE.Group();
+            var bm = new THREE.MeshStandardMaterial({ color: 0xf27ba7, roughness: 0.6 });
+            [-1, 1].forEach(function(sd) { var cn = new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.058, 6), bm); cn.rotation.z = sd * 1.85; cn.position.x = sd * 0.031; bow.add(cn); });
+            bow.add(new THREE.Mesh(new THREE.SphereGeometry(0.017, 8, 8), bm));
+            accG.add(bow); P.accParts.bow = bow;
+          }
+          var tag = makePetTag(name); tag.position.y = 0.88; g.add(tag);
+          g.userData.parts = P;
+          done(g);
+        } catch (e2) { done(null); }
+      }, function() { done(null); });
+    } catch (e) { done(null); }
+  });
+}
+var _pe = null, _pq = null, _pv = null;
+var PET_ANIM_BONES = ["leg_front_left_top0", "leg_front_right_top0", "leg_hind_left_top0", "leg_hind_right_top0", "leg_front_left_bot0", "leg_front_right_bot0", "leg_hind_left_bot0", "leg_hind_right_bot0", "tail0", "tail1", "tail2", "tail3", "tail4", "tail5", "head0", "neck0", "pelvis", "body"];
+function poseRealCat(st, dt, t) {
+  var P = st.P; if (!P || !P.B) return;
+  if (!_pe) { _pe = new THREE.Euler(); _pq = new THREE.Quaternion(); _pv = new THREE.Vector3(); }
+  var B = P.B, D = {};
+  function add(n, x, y, z) { var d = D[n] || (D[n] = [0, 0, 0]); d[0] += x || 0; d[1] += y || 0; d[2] += z || 0; }
+  var m = st.moving01 || 0, ph = st.phase || 0;
+  var sitA = st.sitA || 0, lieA = st.lieA || 0, rubA = st.rubA || 0, lickA = st.lickA || 0;
+  var bob = Math.abs(Math.sin(ph)) * 0.016 * m + Math.sin(t * 1.6 + (st.seed || 0)) * 0.0025;
+  P.wrap.position.y = P.groundY + bob - 0.185 * sitA - 0.315 * lieA;
+  if (m > 0.01 && sitA < 0.5 && lieA < 0.5) {
+    add("leg_front_left_top0", Math.sin(ph) * 0.55 * m, 0, 0);
+    add("leg_hind_right_top0", Math.sin(ph + 0.35) * 0.5 * m, 0, 0);
+    add("leg_front_right_top0", Math.sin(ph + Math.PI) * 0.55 * m, 0, 0);
+    add("leg_hind_left_top0", Math.sin(ph + Math.PI + 0.35) * 0.5 * m, 0, 0);
+    add("leg_front_left_bot0", (0.18 + 0.5 * Math.max(0, Math.sin(ph + 2.1))) * m, 0, 0);
+    add("leg_front_right_bot0", (0.18 + 0.5 * Math.max(0, Math.sin(ph + Math.PI + 2.1))) * m, 0, 0);
+    add("leg_hind_left_bot0", (0.15 + 0.4 * Math.max(0, Math.sin(ph + Math.PI + 2.4))) * m, 0, 0);
+    add("leg_hind_right_bot0", (0.15 + 0.4 * Math.max(0, Math.sin(ph + 2.4))) * m, 0, 0);
+    add("body", 0, 0, Math.sin(ph) * 0.03 * m);
+  }
+  var tailUp = 0.45 + 0.3 * m + 0.45 * rubA;
+  if (st.mode === "carry") tailUp = -0.5;
+  add("tail0", tailUp * (1 - lieA * 0.7) - 0.35 * sitA, 0, Math.sin(t * 1.9 + (st.seed || 0)) * 0.07 + 0.8 * sitA + 0.95 * lieA);
+  for (var ti = 1; ti <= 5; ti++) {
+    add("tail" + ti, Math.sin(t * 2.3 + (st.seed || 0) - ti * 0.65) * 0.06 + 0.05, 0, Math.sin(t * 1.6 + (st.seed || 0) - ti * 0.55) * 0.05 + (ti <= 3 ? (0.38 * sitA + 0.32 * lieA) : 0));
+  }
+  if (sitA > 0.01) {
+    add("leg_hind_left_top0", -1.02 * sitA, 0, 0); add("leg_hind_right_top0", -1.02 * sitA, 0, 0);
+    add("leg_hind_left_bot0", 1.8 * sitA, 0, 0); add("leg_hind_right_bot0", 1.8 * sitA, 0, 0);
+    add("leg_front_left_top0", -0.05 * sitA, 0, 0); add("leg_front_right_top0", -0.05 * sitA, 0, 0);
+    add("pelvis", 0.18 * sitA, 0, 0); add("body", -0.10 * sitA, 0, 0);
+    add("head0", -0.10 * sitA, 0, 0);
+  }
+  if (lieA > 0.01) {
+    add("leg_front_left_top0", -1.28 * lieA, 0, 0); add("leg_front_right_top0", -1.28 * lieA, 0, 0);
+    add("leg_front_left_bot0", 0.12 * lieA, 0, 0); add("leg_front_right_bot0", 0.12 * lieA, 0, 0);
+    add("leg_hind_left_top0", -0.30 * lieA, 0, 0.8 * lieA); add("leg_hind_right_top0", -0.30 * lieA, 0, -0.8 * lieA);
+    add("leg_hind_left_bot0", 0.45 * lieA, 0, 0); add("leg_hind_right_bot0", 0.45 * lieA, 0, 0);
+    add("head0", (0.34 * (st.sleepA || 0) - 0.04) * lieA, Math.sin(t * 0.4 + (st.seed || 0)) * 0.05 * lieA, 0);
+  }
+  if (st.mode === "carry") {
+    add("leg_front_left_top0", 0.14, 0, 0); add("leg_front_right_top0", 0.14, 0, 0);
+    add("leg_front_left_bot0", 0.3, 0, 0); add("leg_front_right_bot0", 0.3, 0, 0);
+    add("leg_hind_left_top0", 0.38, 0, 0); add("leg_hind_right_top0", 0.38, 0, 0);
+    add("leg_hind_left_bot0", 0.35, 0, 0); add("leg_hind_right_bot0", 0.35, 0, 0);
+    add("head0", -0.06, Math.sin(t * 0.55 + (st.seed || 0)) * 0.32, Math.sin(t * 0.8 + (st.seed || 0)) * 0.06);
+  }
+  if (rubA > 0.01) {
+    add("head0", -0.05 * rubA, -0.55 * rubA, (0.34 + Math.sin(t * 1.25 + (st.seed || 0)) * 0.13) * rubA);
+    add("neck0", 0, -0.3 * rubA, 0.18 * rubA);
+  }
+  if (lickA > 0.01) {
+    var nod = st.lickOn ? Math.sin(t * 8.5) * 0.055 : 0;
+    add("leg_front_left_top0", -1.45 * lickA, 0, 0);
+    add("leg_front_left_bot0", 1.25 * lickA, 0, 0);
+    add("head0", (0.52 + nod) * lickA, 0.18 * lickA, 0);
+    add("neck0", 0.22 * lickA, 0, 0);
+  }
+  if (st.petT > 0) add("head0", -0.06, 0, 0.16 + Math.sin(t * 9) * 0.04);
+  for (var bi = 0; bi < PET_ANIM_BONES.length; bi++) {
+    var bn = PET_ANIM_BONES[bi], bb = B[bn], rr = P.rest[bn];
+    if (!bb || !rr) continue;
+    var dd = D[bn];
+    if (!dd) { bb.quaternion.copy(rr); continue; }
+    _pe.set(dd[0], dd[1], dd[2]); _pq.setFromEuler(_pe);
+    bb.quaternion.copy(rr).multiply(_pq);
+  }
+  if (P.accG) {
+    st.g.updateMatrixWorld(true);
+    if (P.accParts.collar && B.neck0) {
+      B.neck0.getWorldPosition(_pv);
+      P.accParts.collar.position.copy(st.g.worldToLocal(_pv));
+      if (P.accParts.bell) P.accParts.bell.position.set(P.accParts.collar.position.x, P.accParts.collar.position.y - 0.052, P.accParts.collar.position.z + 0.038);
+    }
+    if (P.accParts.bow && B.head0) {
+      B.head0.getWorldPosition(_pv);
+      var hp = st.g.worldToLocal(_pv);
+      P.accParts.bow.position.set(hp.x + 0.052, hp.y + 0.088, hp.z - 0.01);
+    }
+  }
+}
+function petEase(cur, target, k, dt) { return (cur || 0) + (target - (cur || 0)) * Math.min(1, dt * k); }
+function updateRealPet(dt, t) {
+  var P = PET.P, g = PET.g;
+  if (PET.mode === "carry") {
+    var fwdV = new THREE.Vector3(Math.sin(avatar.rotation.y), 0, Math.cos(avatar.rotation.y));
+    g.position.copy(avatar.position).addScaledVector(fwdV, 0.37);
+    g.position.y = avatar.position.y + 1.0 + Math.sin(t * 2.1) * 0.015;
+    var dc = avatar.rotation.y - g.rotation.y;
+    while (dc > Math.PI) dc -= Math.PI * 2;
+    while (dc < -Math.PI) dc += Math.PI * 2;
+    g.rotation.y += dc * Math.min(1, dt * 10);
+    PET.beh = "none"; PET.moving01 = 0;
+    PET.sitA = petEase(PET.sitA, 0, 6, dt); PET.lieA = petEase(PET.lieA, 0, 6, dt);
+    PET.rubA = petEase(PET.rubA, 0, 6, dt); PET.lickA = petEase(PET.lickA, 0, 6, dt);
+    if (PET.carryMeowT === undefined) PET.carryMeowT = 6 + Math.random() * 6;
+    PET.carryMeowT -= dt;
+    if (PET.carryMeowT <= 0) { PET.carryMeowT = 7 + Math.random() * 8; if (Math.random() < 0.7) meow(0.65); }
+    poseRealCat(PET, dt, t);
+  } else {
+    var ry = avatar.rotation.y;
+    var fx = avatar.position.x - Math.sin(ry) * 0.95 + Math.cos(ry) * 0.5;
+    var fz = avatar.position.z - Math.cos(ry) * 0.95 - Math.sin(ry) * 0.5;
+    var beh = PET.beh || "none";
+    if (beh !== "none") {
+      PET.behT -= dt;
+      var ownerDist = Math.hypot(avatar.position.x - g.position.x, avatar.position.z - g.position.z);
+      if (PET.behT <= 0 || ownerDist > 2.6) { beh = PET.beh = "none"; PET.nextBeh = 13 + Math.random() * 14; }
+    }
+    var tx = fx, tz = fz, speedCap = 5.4, stationary = false;
+    if (beh === "rub") {
+      if (PET.rubAng === undefined) PET.rubAng = Math.atan2(g.position.x - avatar.position.x, g.position.z - avatar.position.z);
+      PET.rubAng += dt * 0.55;
+      tx = avatar.position.x + Math.sin(PET.rubAng) * 0.47;
+      tz = avatar.position.z + Math.cos(PET.rubAng) * 0.47;
+      speedCap = 1.7;
+    } else if (beh === "lick" || beh === "lie") stationary = true;
+    var dx = tx - g.position.x, dz = tz - g.position.z;
+    var dist = Math.hypot(dx, dz);
+    if (dist > 13 && beh === "none") { g.position.set(fx, avatar.position.y, fz); dist = 0; meow(0.7); }
+    var moving = 0;
+    if (!stationary && dist > 0.16) {
+      PET.idleT = 0;
+      var sp = Math.min(speedCap, Math.max(0.9, dist * 2.4));
+      g.position.x += dx / dist * sp * dt; g.position.z += dz / dist * sp * dt;
+      g.position.y = avatar.position.y;
+      var want = Math.atan2(dx / dist, dz / dist);
+      var df = want - g.rotation.y;
+      while (df > Math.PI) df -= Math.PI * 2;
+      while (df < -Math.PI) df += Math.PI * 2;
+      g.rotation.y += df * Math.min(1, dt * 9);
+      PET.phase += dt * (5 + sp * 2.4);
+      moving = Math.min(1, sp / 2.4);
+    } else {
+      PET.idleT += dt;
+      if (beh === "none") {
+        var wa = Math.atan2(avatar.position.x - g.position.x, avatar.position.z - g.position.z);
+        var df2 = wa - g.rotation.y;
+        while (df2 > Math.PI) df2 -= Math.PI * 2;
+        while (df2 < -Math.PI) df2 += Math.PI * 2;
+        g.rotation.y += df2 * Math.min(1, dt * 3);
+        if (PET.idleT > 1.6) {
+          PET.nextBeh -= dt;
+          if (PET.nextBeh <= 0) {
+            var rv = Math.random();
+            PET.beh = rv < 0.45 ? "rub" : (rv < 0.75 ? "lick" : "lie");
+            PET.behT = PET.beh === "rub" ? 5.5 : (PET.beh === "lick" ? 7 : 10 + Math.random() * 5);
+            if (PET.beh === "rub") PET.rubAng = Math.atan2(g.position.x - avatar.position.x, g.position.z - avatar.position.z);
+            beh = PET.beh;
+          }
+        }
+      }
+    }
+    PET.moving01 = moving;
+    var sitT = beh === "lick" ? 1 : (beh === "none" && PET.idleT > 2.2 && moving === 0 ? 1 : 0);
+    PET.sitA = petEase(PET.sitA, sitT, 5, dt);
+    PET.lieA = petEase(PET.lieA, beh === "lie" ? 1 : 0, 3.2, dt);
+    PET.rubA = petEase(PET.rubA, beh === "rub" && Math.hypot(avatar.position.x - g.position.x, avatar.position.z - g.position.z) < 0.95 ? 1 : 0, 5, dt);
+    PET.lickA = petEase(PET.lickA, beh === "lick" ? 1 : 0, 5, dt);
+    PET.sleepA = petEase(PET.sleepA, beh === "lie" && PET.behT < 5 ? 1 : 0, 1.5, dt);
+    PET.lickOn = beh === "lick" ? ((t % 3.2) < 2.1) : false;
+    poseRealCat(PET, dt, t);
+    PET.meowT -= dt;
+    if (PET.meowT <= 0) { PET.meowT = 24 + Math.random() * 22; if (Math.random() < 0.75) meow(0.55); }
+  }
+  if (PET.petT > 0) {
+    PET.petT -= dt;
+    PET.heartT -= dt;
+    if (PET.heartT <= 0) { PET.heartT = 0.28; spawnHeart(g.position); }
+    if (PET.petT <= 0) stopPurr();
+  }
+}
+function stepRealRemotePet(o, dt, t) {
+  var rp = o.pet, g = rp.g;
+  g.visible = o.grp.visible;
+  if (!g.visible) return;
+  if (o.petMode === "carry") {
+    var ry = o.grp.rotation.y;
+    g.position.set(o.grp.position.x + Math.sin(ry) * 0.37, o.grp.position.y + 1.0 + Math.sin(t * 2.1 + rp.seed) * 0.015, o.grp.position.z + Math.cos(ry) * 0.37);
+    g.rotation.y = ry;
+    rp.moving01 = 0; rp.beh = "none";
+    rp.sitA = petEase(rp.sitA, 0, 6, dt); rp.lieA = petEase(rp.lieA, 0, 6, dt); rp.rubA = petEase(rp.rubA, 0, 6, dt); rp.lickA = petEase(rp.lickA, 0, 6, dt);
+    poseRealCat(rp, dt, t);
+    return;
+  }
+  var beh = o.petBeh === 1 ? "rub" : (o.petBeh === 2 ? "lick" : (o.petBeh === 3 ? "lie" : "none"));
+  rp.beh = beh;
+  var ry2 = o.grp.rotation.y;
+  var tx = o.grp.position.x - Math.sin(ry2) * 0.95 + Math.cos(ry2) * 0.5;
+  var tz = o.grp.position.z - Math.cos(ry2) * 0.95 - Math.sin(ry2) * 0.5;
+  var speedCap = 5.4, stationary = false;
+  if (beh === "rub") {
+    if (rp.rubAng === undefined) rp.rubAng = Math.atan2(g.position.x - o.grp.position.x, g.position.z - o.grp.position.z);
+    rp.rubAng += dt * 0.55;
+    tx = o.grp.position.x + Math.sin(rp.rubAng) * 0.47;
+    tz = o.grp.position.z + Math.cos(rp.rubAng) * 0.47;
+    speedCap = 1.7;
+  } else if (beh === "lick" || beh === "lie") stationary = true;
+  var dx = tx - g.position.x, dz = tz - g.position.z;
+  var dist = Math.hypot(dx, dz);
+  if (dist > 13) { g.position.set(tx, 0, tz); dist = 0; }
+  var moving = 0;
+  if (!stationary && dist > 0.16) {
+    rp.idleT = 0;
+    var sp = Math.min(speedCap, Math.max(0.9, dist * 2.4));
+    g.position.x += dx / dist * sp * dt; g.position.z += dz / dist * sp * dt;
+    g.position.y += (0 - g.position.y) * Math.min(1, dt * 6);
+    var want = Math.atan2(dx / dist, dz / dist);
+    var df = want - g.rotation.y;
+    while (df > Math.PI) df -= Math.PI * 2;
+    while (df < -Math.PI) df += Math.PI * 2;
+    g.rotation.y += df * Math.min(1, dt * 9);
+    rp.phase += dt * (5 + sp * 2.4);
+    moving = Math.min(1, sp / 2.4);
+  } else {
+    rp.idleT += dt;
+    var wa = Math.atan2(o.grp.position.x - g.position.x, o.grp.position.z - g.position.z);
+    var df3 = wa - g.rotation.y;
+    while (df3 > Math.PI) df3 -= Math.PI * 2;
+    while (df3 < -Math.PI) df3 += Math.PI * 2;
+    g.rotation.y += df3 * Math.min(1, dt * 3);
+  }
+  rp.moving01 = moving;
+  var sitT = beh === "lick" ? 1 : (beh === "none" && rp.idleT > 2.2 && moving === 0 ? 1 : 0);
+  rp.sitA = petEase(rp.sitA, sitT, 5, dt);
+  rp.lieA = petEase(rp.lieA, beh === "lie" ? 1 : 0, 3.2, dt);
+  rp.rubA = petEase(rp.rubA, beh === "rub" && Math.hypot(o.grp.position.x - g.position.x, o.grp.position.z - g.position.z) < 0.95 ? 1 : 0, 5, dt);
+  rp.lickA = petEase(rp.lickA, beh === "lick" ? 1 : 0, 5, dt);
+  rp.sleepA = petEase(rp.sleepA, beh === "lie" ? 0.7 : 0, 1.5, dt);
+  rp.lickOn = beh === "lick" ? ((t % 3.2) < 2.1) : false;
+  poseRealCat(rp, dt, t);
+}
+function initRealState(st) {
+  st.sitA = 0; st.lieA = 0; st.rubA = 0; st.lickA = 0; st.sleepA = 0; st.moving01 = 0; st.beh = "none"; st.behT = 0; st.lickOn = false;
+  if (st.seed === undefined) st.seed = Math.random() * 9;
+  return st;
+}
+function upgradePetToReal() {
+  if (!PET) return;
+  var myPet = PET, idx = PET.idx;
+  var sh = U.shrines[idx]; if (!sh) return;
+  buildRealCat(petCfgOf(sh), sh.name, function(ng) {
+    if (!ng) return;
+    if (PET !== myPet) { disposeRealCat(ng); return; }
+    ng.position.copy(myPet.g.position); ng.rotation.y = myPet.g.rotation.y;
+    scene.remove(myPet.g); scene.add(ng);
+    PET.g = ng; PET.P = ng.userData.parts;
+    initRealState(PET);
+    PET.nextBeh = 9 + Math.random() * 10; PET.rubAng = undefined;
+  });
+}
+function upgradeRemotePet(o) {
+  var rp = o.pet; if (!rp || !o.petCfg) return;
+  buildRealCat(o.petCfg, o.petName || "Bé", function(ng) {
+    if (!ng) return;
+    if (o.pet !== rp) { disposeRealCat(ng); return; }
+    ng.position.copy(rp.g.position); ng.rotation.y = rp.g.rotation.y;
+    scene.remove(rp.g); scene.add(ng);
+    rp.g = ng; rp.P = ng.userData.parts;
+    initRealState(rp);
+  });
+}
+setTimeout(function() { loadCatModel(); loadCatSfx(); }, 3500);
+
 function spawnPet(idx) {
   var sh = U.shrines[idx]; if (!sh) return;
   despawnPet();
@@ -4304,9 +4711,10 @@ function spawnPet(idx) {
   document.getElementById("carryBtn").textContent = "🤲 Bế bé";
   setTimeout(function() { meow(1); }, 450);
   toast("🐱 " + sh.name + " đã quay về bên bạn!");
+  upgradePetToReal();
 }
 function despawnPet() {
-  if (PET) { scene.remove(PET.g); PET = null; stopPurr(); }
+  if (PET) { scene.remove(PET.g); if (PET.P && PET.P.real) disposeRealCat(PET.g); PET = null; stopPurr(); }
   for (var i = 0; i < PET_HEARTS.length; i++) scene.remove(PET_HEARTS[i].sp);
   PET_HEARTS = [];
   var pb = document.getElementById("petBar"); if (pb) pb.style.display = "none";
@@ -4320,6 +4728,7 @@ function petCarryToggle() {
     PET.mode = "carry";
     document.getElementById("carryBtn").textContent = "⬇️ Thả bé xuống";
     meow(0.8);
+    PET.carryMeowT = 5 + Math.random() * 6;
   }
 }
 function petStroke() {
@@ -4330,6 +4739,7 @@ function petStroke() {
 }
 function petCall() {
   if (!PET) return;
+  if (PET.beh) { PET.beh = "none"; PET.nextBeh = 13 + Math.random() * 14; }
   PET.mode = "follow";
   document.getElementById("carryBtn").textContent = "🤲 Bế bé";
   PET.g.position.set(avatar.position.x + 1.1, avatar.position.y, avatar.position.z + 0.7);
@@ -4358,56 +4768,54 @@ function spawnHeart(pos) {
   scene.add(sp);
   PET_HEARTS.push({ sp: sp, life: 1.1, seed: Math.random() * 9 });
 }
+var SFX_URLS = null, SFX_LOADING = false;
+function loadCatSfx(cb) {
+  if (SFX_URLS) { if (cb) cb(true); return; }
+  if (SFX_LOADING) { if (cb) SFX_CBS.push(cb); return; }
+  SFX_LOADING = true; if (cb) SFX_CBS.push(cb);
+  var sc = document.createElement("script");
+  sc.src = "cat-sfx.js";
+  sc.onload = function() {
+    try {
+      function toUrl(b64) {
+        var bin = atob(b64); var bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
+      }
+      SFX_URLS = { meows: [toUrl(window.__SFX.meow1), toUrl(window.__SFX.meow2), toUrl(window.__SFX.meow3)], purr: toUrl(window.__SFX.purr) };
+      SFX_LOADING = false;
+      var c = SFX_CBS; SFX_CBS = []; c.forEach(function(f) { f(true); });
+    } catch (e) { SFX_LOADING = false; var c2 = SFX_CBS; SFX_CBS = []; c2.forEach(function(f) { f(false); }); }
+  };
+  sc.onerror = function() { SFX_LOADING = false; var c = SFX_CBS; SFX_CBS = []; c.forEach(function(f) { f(false); }); };
+  document.head.appendChild(sc);
+}
+var SFX_CBS = [];
 function meow(vol) {
-  if (!AC || !settings().sfx) return;
+  if (!settings().sfx) return;
+  if (!SFX_URLS) { loadCatSfx(); return; }
   try {
-    var t0 = AC.currentTime + 0.01;
-    var o = AC.createOscillator(); o.type = "sawtooth";
-    var o2 = AC.createOscillator(); o2.type = "triangle";
-    var f = AC.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 1500; f.Q.value = 2;
-    var gn = AC.createGain();
-    var v = (vol || 1) * 0.085;
-    o.frequency.setValueAtTime(520, t0);
-    o.frequency.exponentialRampToValueAtTime(840, t0 + 0.13);
-    o.frequency.exponentialRampToValueAtTime(660, t0 + 0.3);
-    o.frequency.exponentialRampToValueAtTime(330, t0 + 0.52);
-    o2.frequency.setValueAtTime(780, t0);
-    o2.frequency.exponentialRampToValueAtTime(1200, t0 + 0.13);
-    o2.frequency.exponentialRampToValueAtTime(990, t0 + 0.3);
-    o2.frequency.exponentialRampToValueAtTime(500, t0 + 0.52);
-    var lfo = AC.createOscillator(); lfo.frequency.value = 26;
-    var lg = AC.createGain(); lg.gain.value = 14;
-    lfo.connect(lg); lg.connect(o.frequency);
-    gn.gain.setValueAtTime(0, t0);
-    gn.gain.linearRampToValueAtTime(v, t0 + 0.06);
-    gn.gain.setValueAtTime(v, t0 + 0.34);
-    gn.gain.linearRampToValueAtTime(0, t0 + 0.55);
-    o.connect(f); o2.connect(f); f.connect(gn); gn.connect(AC.destination);
-    o.start(t0); o2.start(t0); lfo.start(t0);
-    o.stop(t0 + 0.6); o2.stop(t0 + 0.6); lfo.stop(t0 + 0.6);
+    var a = new Audio(SFX_URLS.meows[Math.floor(Math.random() * SFX_URLS.meows.length)]);
+    a.volume = Math.max(0.1, Math.min(1, (vol || 1) * 0.9));
+    var pr = a.play(); if (pr && pr.catch) pr.catch(function() {});
   } catch (e) {}
 }
 function startPurr() {
-  if (!AC || !settings().sfx || PURR) return;
+  if (!settings().sfx || PURR) return;
+  if (!SFX_URLS) { loadCatSfx(function(ok) { if (ok && PET && PET.petT > 0) startPurr(); }); return; }
   try {
-    var o = AC.createOscillator(); o.type = "sawtooth"; o.frequency.value = 54;
-    var f = AC.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 240;
-    var gn = AC.createGain(); gn.gain.value = 0.03;
-    var lfo = AC.createOscillator(); lfo.frequency.value = 23;
-    var lg = AC.createGain(); lg.gain.value = 0.026;
-    lfo.connect(lg); lg.connect(gn.gain);
-    o.connect(f); f.connect(gn); gn.connect(AC.destination);
-    o.start(); lfo.start();
-    PURR = { o: o, lfo: lfo, gn: gn };
+    var a = new Audio(SFX_URLS.purr);
+    a.loop = true; a.volume = 0;
+    var pr = a.play(); if (pr && pr.catch) pr.catch(function() {});
+    PURR = { el: a };
+    var step = 0;
+    var iv = setInterval(function() { step++; if (!PURR || PURR.el !== a) { clearInterval(iv); return; } a.volume = Math.min(0.55, step * 0.11); if (step >= 5) clearInterval(iv); }, 60);
   } catch (e) {}
 }
 function stopPurr() {
   if (!PURR) return;
-  var p = PURR; PURR = null;
-  try {
-    p.gn.gain.linearRampToValueAtTime(0, AC.currentTime + 0.15);
-    setTimeout(function() { try { p.o.stop(); p.lfo.stop(); } catch (e) {} }, 220);
-  } catch (e) {}
+  var a = PURR.el; PURR = null;
+  try { a.pause(); a.currentTime = 0; } catch (e) {}
 }
 function updatePet(dt, t) {
   for (var hi = PET_HEARTS.length - 1; hi >= 0; hi--) {
@@ -4416,6 +4824,7 @@ function updatePet(dt, t) {
     else { H.sp.position.y += dt * 0.35; H.sp.position.x += Math.sin(t * 3 + H.seed) * dt * 0.08; H.sp.material.opacity = Math.min(0.95, H.life / 0.5); }
   }
   if (!PET || !avatar) return;
+  if (PET.P.real) { updateRealPet(dt, t); return; }
   var P = PET.P, g = PET.g, li;
   if (PET.mode === "carry") {
     var fwdV = new THREE.Vector3(Math.sin(avatar.rotation.y), 0, Math.cos(avatar.rotation.y));
@@ -4430,6 +4839,9 @@ function updatePet(dt, t) {
     P.tail.rotation.x = 2.55; P.tail.rotation.z = 0; P.tail.rotation.y = 0;
     P.tailMid.rotation.x = 0.35 + Math.sin(t * 1.8) * 0.13;
     P.head.rotation.y = Math.sin(t * 0.6) * 0.3;
+    if (PET.carryMeowT === undefined) PET.carryMeowT = 6 + Math.random() * 6;
+    PET.carryMeowT -= dt;
+    if (PET.carryMeowT <= 0) { PET.carryMeowT = 7 + Math.random() * 8; if (Math.random() < 0.7) meow(0.65); }
     if (PET.petT <= 0) { P.head.rotation.z = 0; setPetEyes(1); }
   } else {
     P.bodyG.rotation.x = 0;
@@ -4707,6 +5119,14 @@ function openPetPanel() {
 }
 function closePetPanel() { document.getElementById("petModal").style.display = "none"; }
 function renderPetOptions() {
+  var vr = document.getElementById("petVars"); vr.innerHTML = "";
+  PET_VARIANTS.forEach(function(v) {
+    var b = document.createElement("button");
+    b.className = "pet-opt" + ((petDraft.variant || "cam") === v[0] ? " sel" : "");
+    b.innerHTML = '<span style="display:inline-block;width:13px;height:13px;border-radius:50%;background:' + v[2] + ';border:1px solid rgba(0,0,0,.25);vertical-align:-2px;margin-right:5px"></span>' + v[1];
+    b.onclick = function() { petDraft.variant = v[0]; petDraft.fur = v[3].fur; petDraft.pattern = v[3].pattern; renderPetOptions(); };
+    vr.appendChild(b);
+  });
   var fr = document.getElementById("petFurs"); fr.innerHTML = "";
   PET_FURS.forEach(function(c) {
     var b = document.createElement("button");
@@ -5313,6 +5733,7 @@ function pollFeed() {
 /* ---------- hien dien: vi tri + mau ao cua tung khach ---------- */
 function stepRemotePet(o, dt, t) {
   var rp = o.pet; if (!rp) return;
+  if (rp.P && rp.P.real) { stepRealRemotePet(o, dt, t); return; }
   var g = rp.g, P = rp.P, li;
   g.visible = o.grp.visible;
   if (!g.visible) return;
@@ -5381,9 +5802,9 @@ function sendPresence() {
   var petInfo = null;
   if (PET) {
     var psh = U.shrines[PET.idx], pc = petCfgOf(psh);
-    petInfo = { n: psh ? psh.name : "Bé", f: pc.fur, p: pc.pattern, e: pc.eye, a: pc.acc, m: PET.mode };
+    petInfo = { n: psh ? psh.name : "Bé", f: pc.fur, p: pc.pattern, e: pc.eye, a: pc.acc, m: PET.mode, v: pc.variant || "cam", r: PET.P && PET.P.real ? 1 : 0, b: PET.beh === "rub" ? 1 : (PET.beh === "lick" ? 2 : (PET.beh === "lie" ? 3 : 0)) };
   }
-  var petKey = petInfo ? petInfo.n + "|" + petInfo.f + "|" + petInfo.p + "|" + petInfo.e + "|" + petInfo.a + "|" + petInfo.m : "";
+  var petKey = petInfo ? petInfo.n + "|" + petInfo.f + "|" + petInfo.p + "|" + petInfo.e + "|" + petInfo.a + "|" + petInfo.m + "|" + petInfo.v + "|" + petInfo.r + "|" + petInfo.b : "";
   var moved = Math.hypot(p.x - lastSentPos.x, p.z - lastSentPos.z) > 0.05 || Math.abs(r - lastSentPos.r) > 0.08 || seatId !== (window.__lastSeatSent || null) || petKey !== (window.__lastPetKey || "");
   if (!moved && now - lastPresenceSent < 12000) return;
   lastPresenceSent = now; lastSentPos = { x: p.x, z: p.z, r: r };
@@ -5432,17 +5853,21 @@ function pollPresence() {
         o.tx = e.x || 0; o.tz = e.z || 0; o.tr = e.r || 0;
         o.seatId = e.s || null;
         if (e.pt && e.pt.n) {
-          var pk2 = e.pt.f + "|" + e.pt.p + "|" + e.pt.e + "|" + e.pt.a + "|" + e.pt.n;
+          var pk2 = e.pt.f + "|" + e.pt.p + "|" + e.pt.e + "|" + e.pt.a + "|" + e.pt.n + "|" + (e.pt.v || "cam") + "|" + (e.pt.r ? 1 : 0);
           o.petMode = e.pt.m || "follow";
+          o.petBeh = e.pt.b || 0;
           if (!o.pet || o.pet.key !== pk2) {
-            if (o.pet) scene.remove(o.pet.g);
-            var pg = buildPetCat({ fur: e.pt.f, pattern: e.pt.p, eye: e.pt.e, acc: e.pt.a }, e.pt.n);
+            if (o.pet) { scene.remove(o.pet.g); if (o.pet.P && o.pet.P.real) disposeRealCat(o.pet.g); }
+            o.petCfg = { fur: e.pt.f, pattern: e.pt.p, eye: e.pt.e, acc: e.pt.a, variant: e.pt.v || "cam" };
+            o.petName = e.pt.n;
+            var pg = buildPetCat(o.petCfg, e.pt.n);
             pg.position.set((e.x || 0) + 0.9, 0, (e.z || 0) + 0.9);
             scene.add(pg);
             o.pet = { g: pg, P: pg.userData.parts, key: pk2, phase: 0, idleT: 0, sitting: false, seed: Math.random() * 9 };
+            if (e.pt.r) upgradeRemotePet(o);
           }
         } else if (o.pet) {
-          scene.remove(o.pet.g); o.pet = null; o.petMode = null;
+          scene.remove(o.pet.g); if (o.pet.P && o.pet.P.real) disposeRealCat(o.pet.g); o.pet = null; o.petMode = null;
         }
         if (e.s) { (claims[e.s] = claims[e.s] || []).push(id); }
         spawnQueue.push([id, e]);
