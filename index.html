@@ -4521,13 +4521,13 @@ function updateRealPet(dt, t) {
   var P = PET.P, g = PET.g;
   if (PET.mode === "carry") {
     var fwdV = new THREE.Vector3(Math.sin(avatar.rotation.y), 0, Math.cos(avatar.rotation.y));
-    g.position.copy(avatar.position).addScaledVector(fwdV, 0.42);
-    g.position.y = avatar.position.y + 1.06 + Math.sin(t * 2.1) * 0.015;
+    g.position.copy(avatar.position).addScaledVector(fwdV, 0.38);
+    g.position.y = avatar.position.y + 0.78 + Math.sin(t * 2.1) * 0.015;
     var dc = avatar.rotation.y - g.rotation.y;
     while (dc > Math.PI) dc -= Math.PI * 2;
     while (dc < -Math.PI) dc += Math.PI * 2;
     g.rotation.y += dc * Math.min(1, dt * 10);
-    P.wrap.rotation.x = -0.5;
+    P.wrap.rotation.x = -0.85;
     PET.beh = "none"; PET.moving01 = 0;
     PET.sitA = petEase(PET.sitA, 0, 6, dt); PET.lieA = petEase(PET.lieA, 0, 6, dt);
     PET.rubA = petEase(PET.rubA, 0, 6, dt); PET.lickA = petEase(PET.lickA, 0, 6, dt);
@@ -4615,9 +4615,9 @@ function stepRealRemotePet(o, dt, t) {
   if (!g.visible) return;
   if (o.petMode === "carry") {
     var ry = o.grp.rotation.y;
-    g.position.set(o.grp.position.x + Math.sin(ry) * 0.42, o.grp.position.y + 1.06 + Math.sin(t * 2.1 + rp.seed) * 0.015, o.grp.position.z + Math.cos(ry) * 0.42);
+    g.position.set(o.grp.position.x + Math.sin(ry) * 0.38, o.grp.position.y + 0.78 + Math.sin(t * 2.1 + rp.seed) * 0.015, o.grp.position.z + Math.cos(ry) * 0.38);
     g.rotation.y = ry;
-    rp.P.wrap.rotation.x = -0.5;
+    rp.P.wrap.rotation.x = -0.85;
     rp.moving01 = 0; rp.beh = "none";
     rp.sitA = petEase(rp.sitA, 0, 6, dt); rp.lieA = petEase(rp.lieA, 0, 6, dt); rp.rubA = petEase(rp.rubA, 0, 6, dt); rp.lickA = petEase(rp.lickA, 0, 6, dt);
     poseRealCat(rp, dt, t);
