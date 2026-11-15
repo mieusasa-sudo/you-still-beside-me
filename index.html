@@ -4388,7 +4388,7 @@ function buildRealCat(cfg, name, done) {
           var inner = gltf.scene;
           var box = new THREE.Box3().setFromObject(inner);
           var size = box.getSize(new THREE.Vector3());
-          var s = 0.58 / Math.max(size.y, 0.001);
+          var s = 0.66 / Math.max(size.y, 0.001);
           var wrap = new THREE.Group();
           wrap.scale.setScalar(s);
           wrap.position.y = -box.min.y * s;
@@ -4425,7 +4425,7 @@ function buildRealCat(cfg, name, done) {
             bow.add(new THREE.Mesh(new THREE.SphereGeometry(0.017, 8, 8), bm));
             accG.add(bow); P.accParts.bow = bow;
           }
-          var tag = makePetTag(name); tag.position.y = 0.88; g.add(tag);
+          var tag = makePetTag(name); tag.position.y = 0.86; g.add(tag);
           g.userData.parts = P;
           done(g);
         } catch (e2) { done(null); }
@@ -4521,12 +4521,13 @@ function updateRealPet(dt, t) {
   var P = PET.P, g = PET.g;
   if (PET.mode === "carry") {
     var fwdV = new THREE.Vector3(Math.sin(avatar.rotation.y), 0, Math.cos(avatar.rotation.y));
-    g.position.copy(avatar.position).addScaledVector(fwdV, 0.37);
-    g.position.y = avatar.position.y + 1.0 + Math.sin(t * 2.1) * 0.015;
+    g.position.copy(avatar.position).addScaledVector(fwdV, 0.42);
+    g.position.y = avatar.position.y + 1.06 + Math.sin(t * 2.1) * 0.015;
     var dc = avatar.rotation.y - g.rotation.y;
     while (dc > Math.PI) dc -= Math.PI * 2;
     while (dc < -Math.PI) dc += Math.PI * 2;
     g.rotation.y += dc * Math.min(1, dt * 10);
+    P.wrap.rotation.x = -0.5;
     PET.beh = "none"; PET.moving01 = 0;
     PET.sitA = petEase(PET.sitA, 0, 6, dt); PET.lieA = petEase(PET.lieA, 0, 6, dt);
     PET.rubA = petEase(PET.rubA, 0, 6, dt); PET.lickA = petEase(PET.lickA, 0, 6, dt);
@@ -4535,6 +4536,7 @@ function updateRealPet(dt, t) {
     if (PET.carryMeowT <= 0) { PET.carryMeowT = 7 + Math.random() * 8; if (Math.random() < 0.7) meow(0.65); }
     poseRealCat(PET, dt, t);
   } else {
+    P.wrap.rotation.x = 0;
     var ry = avatar.rotation.y;
     var fx = avatar.position.x - Math.sin(ry) * 0.95 + Math.cos(ry) * 0.5;
     var fz = avatar.position.z - Math.cos(ry) * 0.95 - Math.sin(ry) * 0.5;
@@ -4613,13 +4615,15 @@ function stepRealRemotePet(o, dt, t) {
   if (!g.visible) return;
   if (o.petMode === "carry") {
     var ry = o.grp.rotation.y;
-    g.position.set(o.grp.position.x + Math.sin(ry) * 0.37, o.grp.position.y + 1.0 + Math.sin(t * 2.1 + rp.seed) * 0.015, o.grp.position.z + Math.cos(ry) * 0.37);
+    g.position.set(o.grp.position.x + Math.sin(ry) * 0.42, o.grp.position.y + 1.06 + Math.sin(t * 2.1 + rp.seed) * 0.015, o.grp.position.z + Math.cos(ry) * 0.42);
     g.rotation.y = ry;
+    rp.P.wrap.rotation.x = -0.5;
     rp.moving01 = 0; rp.beh = "none";
     rp.sitA = petEase(rp.sitA, 0, 6, dt); rp.lieA = petEase(rp.lieA, 0, 6, dt); rp.rubA = petEase(rp.rubA, 0, 6, dt); rp.lickA = petEase(rp.lickA, 0, 6, dt);
     poseRealCat(rp, dt, t);
     return;
   }
+  rp.P.wrap.rotation.x = 0;
   var beh = o.petBeh === 1 ? "rub" : (o.petBeh === 2 ? "lick" : (o.petBeh === 3 ? "lie" : "none"));
   rp.beh = beh;
   var ry2 = o.grp.rotation.y;
@@ -4828,8 +4832,8 @@ function updatePet(dt, t) {
   var P = PET.P, g = PET.g, li;
   if (PET.mode === "carry") {
     var fwdV = new THREE.Vector3(Math.sin(avatar.rotation.y), 0, Math.cos(avatar.rotation.y));
-    g.position.copy(avatar.position).addScaledVector(fwdV, 0.37);
-    g.position.y = avatar.position.y + 1.0 + Math.sin(t * 2.1) * 0.015;
+    g.position.copy(avatar.position).addScaledVector(fwdV, 0.42);
+    g.position.y = avatar.position.y + 1.06 + Math.sin(t * 2.1) * 0.015;
     var dc = avatar.rotation.y - g.rotation.y;
     while (dc > Math.PI) dc -= Math.PI * 2;
     while (dc < -Math.PI) dc += Math.PI * 2;
@@ -5739,7 +5743,7 @@ function stepRemotePet(o, dt, t) {
   if (!g.visible) return;
   if (o.petMode === "carry") {
     var ry = o.grp.rotation.y;
-    g.position.set(o.grp.position.x + Math.sin(ry) * 0.37, o.grp.position.y + 1.0 + Math.sin(t * 2.1 + rp.seed) * 0.015, o.grp.position.z + Math.cos(ry) * 0.37);
+    g.position.set(o.grp.position.x + Math.sin(ry) * 0.42, o.grp.position.y + 1.06 + Math.sin(t * 2.1 + rp.seed) * 0.015, o.grp.position.z + Math.cos(ry) * 0.42);
     g.rotation.y = ry;
     P.bodyG.position.y = 0.30; P.bodyG.rotation.x = -0.22;
     for (li = 0; li < 4; li++) P.legs[li].rotation.x = (li < 2 ? 0.55 : 0.3) + Math.sin(t * 2.4 + li * 1.7 + rp.seed) * 0.07;
