@@ -152,7 +152,10 @@ window.__gmLoadSdk = function (cb) {
   #boxNext { right: 8px; }
   .box-zoom { position: absolute; right: 8px; bottom: 8px; display: flex; flex-direction: column; gap: 6px; z-index: 3; }
   .box-zoom button { width: 34px; height: 34px; border-radius: 50%; border: none; background: rgba(20,12,4,.55); color: #ffe9bb; font-size: 18px; cursor: pointer; }
-  #boxPos { position: absolute; left: 50%; transform: translateX(-50%); bottom: 8px; background: rgba(248,238,218,.92); color: #43301b; font-size: 12px; padding: 3px 12px; border-radius: 999px; z-index: 3; white-space: nowrap; }
+  .box-lights { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 6px; z-index: 3; }
+  .box-lights button { border: none; border-radius: 999px; background: rgba(20,12,4,.55); color: #ffe9bb; font-size: 12.5px; font-weight: 700; padding: 7px 11px; cursor: pointer; font-family: inherit; }
+  .box-lights button.on { background: #ffb84d; color: #5b3410; }
+  #boxPos { position: absolute; left: 50%; transform: translateX(-50%); top: 8px; background: rgba(248,238,218,.92); color: #43301b; font-size: 12px; padding: 3px 12px; border-radius: 999px; z-index: 3; white-space: nowrap; }
   #visitList { list-style: none; margin: 6px 0 10px; padding: 0; max-height: 180px; overflow-y: auto; }
   #visitList li { padding: 6px 8px; border-bottom: 1px dashed rgba(67,48,27,.18); font-size: 13.5px; }
   #visitList li span { color: #8a6a45; font-size: 12px; }
@@ -314,7 +317,7 @@ window.__gmLoadSdk = function (cb) {
   <!-- DETAIL -->
   <div id="detailPanel">
     <button id="backBtn" onclick="closeDetail3D()">← Quay lại</button>
-    <div id="boxWrap"><canvas id="boxCanvas"></canvas><button class="box-nav" id="boxPrev" onclick="boxNav(-1)">‹</button><button class="box-nav" id="boxNext" onclick="boxNav(1)">›</button><div class="box-zoom"><button onclick="boxZoom(0.8)">+</button><button onclick="boxZoom(1.25)">−</button></div><div id="boxPos"></div></div>
+    <div id="boxWrap"><canvas id="boxCanvas"></canvas><button class="box-nav" id="boxPrev" onclick="boxNav(-1)">‹</button><button class="box-nav" id="boxNext" onclick="boxNav(1)">›</button><div class="box-zoom"><button onclick="boxZoom(0.8)">+</button><button onclick="boxZoom(1.25)">−</button></div><div class="box-lights"><button id="blWarm" onclick="setBoxLight('warm')">💡 Vàng ấm</button><button id="blColor" onclick="setBoxLight('color')">🌈 Nhấp nháy</button></div><div id="boxPos"></div></div>
     <p class="d-quote" id="dMsg"></p>
     <div class="d-meta" id="dMeta"></div>
     <div class="d-counts" id="dCounts"></div>
@@ -3746,7 +3749,7 @@ function initBox() {
   var hold = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.03, 10), new THREE.MeshStandardMaterial({ color: 0xe9c46a, metalness: 0.7, roughness: 0.3 })); hold.position.y = -0.09; cg.add(hold);
   var fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffb45e, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   fl.scale.set(0.22, 0.3, 1); fl.position.y = 0.17; cg.add(fl);
-  cg.position.set(1.28, -0.49, 0.28); boxScene.add(cg);
+  cg.position.set(0.92, -0.49, 0.38); boxScene.add(cg);
   boxParts.candle = cg; boxParts.flame = fl;
   var ig = new THREE.Group();
   var bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.08, 0.09, 10), new THREE.MeshStandardMaterial({ color: 0xdf9f8a, metalness: 0.6, roughness: 0.4 })); ig.add(bowl);
@@ -3770,14 +3773,49 @@ function initBox() {
   }
   boxParts.lanternL = lantern(-1.35);
   boxParts.lanternR = lantern(1.35);
-  var garland = new THREE.Group();
-  for (var gi = 0; gi < 9; gi++) {
-    var gx = -1.44 + gi * 0.36;
-    var gy = 1.86 - Math.sin((gi / 8) * Math.PI) * 0.16;
-    var bl2 = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), new THREE.MeshStandardMaterial({ color: gi % 2 ? 0xffb7d5 : 0xfff0f5, roughness: 0.7 }));
-    bl2.scale.y = 0.75; bl2.position.set(gx, gy, 0.52); garland.add(bl2);
+  /* DEN DAY TREO: 2 soi vong cung, bong phat sang (vang am / nhap nhay du mau) */
+  boxParts.bulbs = [];
+  function strand(z, sag, n) {
+    var pts = [];
+    for (var si2 = 0; si2 <= 24; si2++) {
+      var tt = si2 / 24;
+      pts.push(new THREE.Vector3(-1.62 + tt * 3.24, 1.9 - Math.sin(tt * Math.PI) * sag, z));
+    }
+    var wire = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x6b4a2f }));
+    boxScene.add(wire);
+    for (var bi2 = 0; bi2 < n; bi2++) {
+      var tb = (bi2 + 0.5) / n;
+      var bx = -1.62 + tb * 3.24, by = 1.9 - Math.sin(tb * Math.PI) * sag - 0.055;
+      var bm = new THREE.MeshStandardMaterial({ color: 0xffca7a, emissive: 0xffb84d, emissiveIntensity: 1.15, roughness: 0.4 });
+      var bulb = new THREE.Mesh(new THREE.SphereGeometry(0.042, 8, 8), bm);
+      bulb.position.set(bx, by, z); boxScene.add(bulb);
+      var gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffc37a, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
+      gl.scale.set(0.3, 0.3, 1); gl.position.set(bx, by, z); boxScene.add(gl);
+      boxParts.bulbs.push({ mat: bm, glow: gl, ph: bi2 * 0.9 + (z > 0.4 ? 0 : 2.1) });
+    }
   }
-  boxScene.add(garland);
+  strand(0.52, 0.2, 11);
+  strand(0.28, 0.13, 9);
+  var warmL = new THREE.PointLight(0xffc37a, 0.5, 7); warmL.position.set(0, 1.55, 0.55); boxScene.add(warmL);
+  applyBoxLightColors();
+  /* KE TU HAI BEN trong hop: trai = hoa, phai = qua (hien du moi mon da tang, khong thay the) */
+  function shelfUnit(ux) {
+    var unit = new THREE.Group();
+    [-0.26, 0.26].forEach(function(px) { [-0.5, 0.46].forEach(function(pz) {
+      var post = new THREE.Mesh(new THREE.BoxGeometry(0.045, 1.52, 0.045), woodD);
+      post.position.set(px, 0.19, pz); unit.add(post);
+    }); });
+    [-0.57, -0.07, 0.43, 0.93].forEach(function(by2) {
+      var board = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.035, 1.02), wood);
+      board.position.set(0, by2, -0.02); unit.add(board);
+    });
+    unit.position.set(ux, 0, 0);
+    boxScene.add(unit);
+    var items = new THREE.Group(); boxScene.add(items);
+    return items;
+  }
+  boxParts.shelfLItems = shelfUnit(-1.38);
+  boxParts.shelfRItems = shelfUnit(1.38);
   for (var pi = 0; pi < 9; pi++) {
     var pt = new THREE.Mesh(new THREE.CircleGeometry(0.035, 8), new THREE.MeshStandardMaterial({ color: pi % 2 ? 0xffc7dd : 0xffe3ee, roughness: 1, side: THREE.DoubleSide }));
     pt.rotation.x = -Math.PI / 2; pt.rotation.z = pi * 1.3;
@@ -3822,23 +3860,57 @@ function refreshBox() {
   boxParts.plaque.material.needsUpdate = true;
   boxParts.candle.visible = sh.candles > 0;
   boxParts.incense.visible = sh.incense > 0;
-  boxParts.flowers.visible = sh.flowers > 0;
-  if (sh.flowers > 0) {
-    while (boxParts.flowers.children.length) boxParts.flowers.remove(boxParts.flowers.children[0]);
-    boxParts.flowers.add(buildFlowerContent(sh.flowerToy || "cuc"));
-  }
+  if (boxParts.flowers) boxParts.flowers.visible = false;
   if (boxParts.gift) { boxScene.remove(boxParts.gift); boxParts.gift = null; }
-  if (sh.gifts > 0) {
-    var gft = buildGiftContent(sh.giftToy || "box");
-    gft.scale.setScalar(1.6);
-    gft.position.set(0.78, -0.56, 0.3);
-    boxScene.add(gft);
-    boxParts.gift = gft;
-  }
+  fillShelf(boxParts.shelfLItems, -1.38, sh.flowers || 0, FLOWERS, sh.flowerToy, true);
+  fillShelf(boxParts.shelfRItems, 1.38, sh.gifts || 0, TOYS, sh.giftToy, false);
+  syncBoxLightBtns();
   document.getElementById("boxPos").textContent = posLabel(currentPos) + " · vị trí của " + sh.name;
   var two = occupiedIdx().length > 1;
   document.getElementById("boxPrev").style.display = two ? "block" : "none";
   document.getElementById("boxNext").style.display = two ? "block" : "none";
+}
+var BOX_PALETTE = [0xff5a5a, 0xffa53a, 0xffe93a, 0x6aff5a, 0x3ac8ff, 0xb05aff, 0xff5ad0];
+function boxLightMode() { return settings().boxLight === "color" ? "color" : "warm"; }
+function applyBoxLightColors() {
+  if (!boxParts.bulbs) return;
+  var mode = boxLightMode();
+  for (var i = 0; i < boxParts.bulbs.length; i++) {
+    var B = boxParts.bulbs[i];
+    var c = mode === "color" ? BOX_PALETTE[i % BOX_PALETTE.length] : 0xffca7a;
+    B.mat.color.set(c);
+    B.mat.emissive.set(mode === "color" ? c : 0xffb84d);
+    B.glow.material.color.set(mode === "color" ? c : 0xffc37a);
+  }
+}
+function syncBoxLightBtns() {
+  var mode = boxLightMode();
+  var w = document.getElementById("blWarm"), c = document.getElementById("blColor");
+  if (w) w.className = mode === "warm" ? "on" : "";
+  if (c) c.className = mode === "color" ? "on" : "";
+}
+function setBoxLight(mode) {
+  settings().boxLight = mode; saveState();
+  applyBoxLightColors(); syncBoxLightBtns();
+}
+function fillShelf(itemsGroup, ux, count, catalog, curId, isFlower) {
+  if (!itemsGroup) return;
+  while (itemsGroup.children.length) itemsGroup.remove(itemsGroup.children[0]);
+  var start = 0;
+  for (var ci = 0; ci < catalog.length; ci++) if (catalog[ci].id === curId) start = ci;
+  var placed = Math.min(count, 24);
+  var lvlY = [-0.55, -0.05, 0.45];
+  for (var n = 0; n < placed; n++) {
+    var layer = Math.floor(n / 12), slot = n % 12;
+    var lvl = Math.floor(slot / 3), zz = (slot % 3) - 1;
+    var item = isFlower ? buildFlowerContent(catalog[(start + n) % catalog.length].id) : buildGiftContent(catalog[(start + n) % catalog.length].id);
+    var holder = new THREE.Group();
+    holder.add(item);
+    holder.scale.setScalar((isFlower ? 0.45 : 1.15) * (layer ? 0.72 : 1));
+    holder.position.set(ux + (layer ? (ux < 0 ? 0.1 : -0.1) : 0), lvlY[lvl], -0.02 + zz * 0.31 + (layer ? 0.1 : 0));
+    holder.rotation.y = (n % 3 - 1) * 0.35;
+    itemsGroup.add(holder);
+  }
 }
 function boxLoop() {
   if (!boxR || document.getElementById("detailPanel").style.display === "none") { boxAnim = 0; return; }
@@ -3853,6 +3925,21 @@ function boxLoop() {
   if (boxParts.flame) { var f = 0.9 + Math.sin(t * 11) * 0.08 + Math.sin(t * 23) * 0.05; boxParts.flame.scale.set(0.22 * f, 0.32 - 0.04 * f, 1); }
   if (boxParts.sparkles) for (var sj = 0; sj < boxParts.sparkles.length; sj++) { var sk2 = boxParts.sparkles[sj]; sk2.sp.position.y += Math.sin(t * 0.7 + sk2.seed) * 0.0009 + 0.0011; sk2.sp.position.x += Math.sin(t * 0.4 + sk2.seed * 2) * 0.0008; if (sk2.sp.position.y > 1.9) sk2.sp.position.y = -0.45; sk2.sp.material.opacity = 0.3 + Math.abs(Math.sin(t * 1.3 + sk2.seed)) * 0.35; }
   if (boxParts.lanternL) { boxParts.lanternL.rotation.z = Math.sin(t * 0.9) * 0.07; boxParts.lanternR.rotation.z = Math.sin(t * 0.9 + 1.4) * 0.07; }
+  if (boxParts.bulbs) {
+    var blMode = boxLightMode();
+    for (var bj = 0; bj < boxParts.bulbs.length; bj++) {
+      var BB = boxParts.bulbs[bj];
+      if (blMode === "color") {
+        var on2 = 0.5 + 0.5 * Math.sin(t * 3.4 + BB.ph);
+        BB.mat.emissiveIntensity = 0.35 + on2 * 1.6;
+        BB.glow.material.opacity = 0.15 + on2 * 0.6;
+      } else {
+        var fl2 = 0.92 + 0.08 * Math.sin(t * 2.1 + BB.ph);
+        BB.mat.emissiveIntensity = 1.15 * fl2;
+        BB.glow.material.opacity = 0.5 * fl2;
+      }
+    }
+  }
   boxR.render(boxScene, boxCam);
 }
 function boxZoom(f) { boxDist = Math.max(3.4, Math.min(6.2, boxDist * f)); }
