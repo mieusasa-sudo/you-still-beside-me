@@ -621,6 +621,7 @@ var avatar, camYaw = 0, camPitch = 0.42, camDistMul = 1, camLookY = 1.25;
 var keys = {};
 var joyVec = { x: 0, y: 0 };
 var flames = [], smokes = [], lanterns = [], kois = [], waterfalls = [], ripples = [], campfires = [], starLayers = [], shootStars = [], petalPts = null, petalSeeds = [];
+var AMB_L = null, HEMI_L = null, SKY_DOME = null, SKY_TEX = null, SKY_CVS = null, SUN_SPR = null, MOON_SPR = null, STAR_VIS = 1;
 var SITTING = null, KNEELING = null, INTERACT = [], FEEDING = null, PELLETS = [], FEED_CD = 0, MO_PULSE = 0, MO_RING = null, MO_SPARKS = [], FX_ON = true, uiTick = 0, sparkles = [];
 var MO_GROUP = null, bellTimer = 3, templeTimer = 18;
 
@@ -640,9 +641,9 @@ function init3D() {
   holder.appendChild(renderer.domElement);
   clock = new THREE.Clock();
 
-  scene.add(new THREE.AmbientLight(0xffe2b0, 0.34));
-  var hemi = new THREE.HemisphereLight(0xffe6b8, 0x2a1a0e, 0.32);
-  scene.add(hemi);
+  AMB_L = new THREE.AmbientLight(0xffe2b0, 0.34); scene.add(AMB_L);
+  HEMI_L = new THREE.HemisphereLight(0xffe6b8, 0x2a1a0e, 0.32); scene.add(HEMI_L);
+  var hemi = HEMI_L;
   var p1 = new THREE.PointLight(0xffc37a, 0.75, 30); p1.position.set(0, 6.4, -1); scene.add(p1);
   var p2 = new THREE.PointLight(0xffb45e, 0.38, 24); p2.position.set(-7.5, 5, 3.5); scene.add(p2);
   var p3 = new THREE.PointLight(0xffb45e, 0.38, 24); p3.position.set(7.5, 5, 3.5); scene.add(p3);
@@ -1781,6 +1782,69 @@ function petalTexture() {
     g.beginPath(); g.ellipse(14, 14, 6, 3.6, 0.6, 0, Math.PI * 2); g.fill();
   });
 }
+/* ===== NGAY DEM THEO MUI GIO VIET NAM (UTC+7) ===== */
+var DN_STOPS = [
+  { h: 0.0,  top: "#0e0c22", mid: "#1d1830", bot: "#33231a", ambC: "#ffe2b0", ambI: 0.34, hSky: "#ffe6b8", hGnd: "#2a1a0e", hemiI: 0.32, star: 1.0 },
+  { h: 4.7,  top: "#0e0c22", mid: "#1d1830", bot: "#33231a", ambC: "#ffe2b0", ambI: 0.34, hSky: "#ffe6b8", hGnd: "#2a1a0e", hemiI: 0.32, star: 1.0 },
+  { h: 5.6,  top: "#1c2b52", mid: "#4a4a72", bot: "#c97a3d", ambC: "#e8c39a", ambI: 0.38, hSky: "#f2cfa4", hGnd: "#33221a", hemiI: 0.34, star: 0.35 },
+  { h: 6.8,  top: "#3d6fb4", mid: "#8fb6dd", bot: "#f2c184", ambC: "#ffe0b3", ambI: 0.47, hSky: "#cfe4f7", hGnd: "#4a3a28", hemiI: 0.45, star: 0.0 },
+  { h: 9.0,  top: "#2f7fd0", mid: "#7ec2ee", bot: "#cfeaf7", ambC: "#fff2d9", ambI: 0.56, hSky: "#bfe3ff", hGnd: "#5a6b4a", hemiI: 0.58, star: 0.0 },
+  { h: 15.5, top: "#2f7fd0", mid: "#7ec2ee", bot: "#cfeaf7", ambC: "#fff2d9", ambI: 0.56, hSky: "#bfe3ff", hGnd: "#5a6b4a", hemiI: 0.58, star: 0.0 },
+  { h: 17.3, top: "#3565a8", mid: "#a8c4e4", bot: "#f7d9a0", ambC: "#ffe9c4", ambI: 0.50, hSky: "#d8e6f5", hGnd: "#54452e", hemiI: 0.50, star: 0.0 },
+  { h: 18.4, top: "#2c3a6e", mid: "#b96a4a", bot: "#f0913c", ambC: "#ffb98a", ambI: 0.41, hSky: "#e8b48f", hGnd: "#3a241c", hemiI: 0.37, star: 0.25 },
+  { h: 19.4, top: "#0d1531", mid: "#232c52", bot: "#4a3350", ambC: "#c9b8a6", ambI: 0.35, hSky: "#cbb8d9", hGnd: "#2a1a26", hemiI: 0.33, star: 0.8 },
+  { h: 20.6, top: "#0e0c22", mid: "#1d1830", bot: "#33231a", ambC: "#ffe2b0", ambI: 0.34, hSky: "#ffe6b8", hGnd: "#2a1a0e", hemiI: 0.32, star: 1.0 },
+  { h: 24.0, top: "#0e0c22", mid: "#1d1830", bot: "#33231a", ambC: "#ffe2b0", ambI: 0.34, hSky: "#ffe6b8", hGnd: "#2a1a0e", hemiI: 0.32, star: 1.0 }
+];
+function vnNowHours() {
+  var n = new Date();
+  var vn = new Date(n.getTime() + n.getTimezoneOffset() * 60000 + 7 * 3600000);
+  return vn.getHours() + vn.getMinutes() / 60 + vn.getSeconds() / 3600;
+}
+var DN_LAST = -1;
+function applyDayNight(force) {
+  if (!SKY_CVS) return;
+  var h = vnNowHours();
+  if (!force && Math.abs(h - DN_LAST) < 0.004) return;
+  DN_LAST = h;
+  var a = DN_STOPS[0], b = DN_STOPS[DN_STOPS.length - 1];
+  for (var i = 0; i < DN_STOPS.length - 1; i++) { if (h >= DN_STOPS[i].h && h <= DN_STOPS[i + 1].h) { a = DN_STOPS[i]; b = DN_STOPS[i + 1]; break; } }
+  var f = Math.max(0, Math.min(1, (h - a.h) / Math.max(0.0001, b.h - a.h)));
+  function LC(x, y) { return new THREE.Color(x).lerp(new THREE.Color(y), f); }
+  function LI(x, y) { return x + (y - x) * f; }
+  var top = LC(a.top, b.top), mid = LC(a.mid, b.mid), bot = LC(a.bot, b.bot);
+  var g = SKY_CVS.getContext("2d");
+  var grd = g.createLinearGradient(0, 0, 0, 512);
+  grd.addColorStop(0, "#" + top.getHexString());
+  grd.addColorStop(0.52, "#" + mid.getHexString());
+  grd.addColorStop(0.75, "#" + bot.getHexString());
+  grd.addColorStop(1, "#" + bot.getHexString());
+  g.fillStyle = grd; g.fillRect(0, 0, 64, 512);
+  SKY_TEX.needsUpdate = true;
+  if (scene) { scene.fog.color.copy(bot); scene.background = top; }
+  if (AMB_L) { AMB_L.color.copy(LC(a.ambC, b.ambC)); AMB_L.intensity = LI(a.ambI, b.ambI); }
+  if (HEMI_L) { HEMI_L.color.copy(LC(a.hSky, b.hSky)); HEMI_L.groundColor.copy(LC(a.hGnd, b.hGnd)); HEMI_L.intensity = LI(a.hemiI, b.hemiI); }
+  STAR_VIS = LI(a.star, b.star);
+  if (SUN_SPR) {
+    var sf = (h - 5.8) / 12.8;
+    if (sf > -0.05 && sf < 1.05) {
+      var sa = Math.PI * Math.max(0, Math.min(1, sf));
+      SUN_SPR.position.set(46 * Math.cos(sa), 5 + 38 * Math.sin(sa), 30);
+      SUN_SPR.material.opacity = Math.max(0, Math.min(0.95, Math.sin(sa) * 3)) * ((sf >= 0 && sf <= 1) ? 1 : 0.35);
+    } else SUN_SPR.material.opacity = 0;
+  }
+  if (MOON_SPR) {
+    var mh = h < 12 ? h + 24 : h;
+    var mf = (mh - 18.4) / 11.6;
+    if (mf > -0.05 && mf < 1.05) {
+      var ma = Math.PI * Math.max(0, Math.min(1, mf));
+      MOON_SPR.position.set(44 * Math.cos(ma), 7 + 34 * Math.sin(ma), 30);
+      MOON_SPR.material.opacity = Math.max(0, Math.min(0.9, Math.sin(ma) * 3)) * ((mf >= 0 && mf <= 1) ? 1 : 0.35);
+    } else MOON_SPR.material.opacity = 0;
+  }
+}
+setInterval(function() { applyDayNight(false); }, 30000);
+
 function buildSkyExtras() {
   function makeStars(n, size, base, amp, speed) {
     var pos = new Float32Array(n * 3);
@@ -2053,11 +2117,16 @@ function buildYard() {
   var gR = gL.clone(); gR.position.x = 7.25; scene.add(gR);
   var baseGround = new THREE.Mesh(new THREE.PlaneGeometry(23.4, 38), grassMat);
   baseGround.rotation.x = -Math.PI / 2; baseGround.position.set(0, -0.02, 12.2); scene.add(baseGround);
-  /* troi hoang hon + trang */
-  var sky = new THREE.Mesh(new THREE.PlaneGeometry(90, 30), new THREE.MeshBasicMaterial({ map: skyTexture(), fog: false }));
-  sky.position.set(0, 11, 30); sky.rotation.y = Math.PI; scene.add(sky);
-  var moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xf5ead0, transparent: true, opacity: 0.9, fog: false, depthWrite: false }));
-  moon.scale.set(4.5, 4.5, 1); moon.position.set(-9, 10.5, 29); scene.add(moon);
+  /* bau troi: vom cau bao quanh 360 do (het loi troi bi cat lam doi) + mat troi/mat trang theo gio VN */
+  SKY_CVS = document.createElement("canvas"); SKY_CVS.width = 64; SKY_CVS.height = 512;
+  SKY_TEX = new THREE.CanvasTexture(SKY_CVS);
+  var dome = new THREE.Mesh(new THREE.SphereGeometry(80, 24, 16), new THREE.MeshBasicMaterial({ map: SKY_TEX, side: THREE.BackSide, fog: false, depthWrite: false }));
+  dome.frustumCulled = false; dome.renderOrder = -10; scene.add(dome); SKY_DOME = dome;
+  SUN_SPR = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffdf8a, transparent: true, opacity: 0, fog: false, depthWrite: false }));
+  SUN_SPR.scale.set(13, 13, 1); scene.add(SUN_SPR);
+  MOON_SPR = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xf5ead0, transparent: true, opacity: 0, fog: false, depthWrite: false }));
+  MOON_SPR.scale.set(6, 6, 1); scene.add(MOON_SPR);
+  applyDayNight(true);
   /* hang rao cuoi san + hang cay xanh hai ben */
   var fenceMat = new THREE.MeshStandardMaterial({ color: 0x4a3826, roughness: 1 });
   for (var fx = -11; fx <= 11; fx += 2.2) {
@@ -3494,11 +3563,11 @@ function animate() {
   }
   for (var sli = 0; sli < starLayers.length; sli++) {
     var SL = starLayers[sli];
-    SL.mat.opacity = SL.base + SL.amp * Math.sin(t * SL.speed + SL.ph);
+    SL.mat.opacity = (SL.base + SL.amp * Math.sin(t * SL.speed + SL.ph)) * STAR_VIS;
   }
   for (var ssi = 0; ssi < shootStars.length; ssi++) {
     var SS = shootStars[ssi];
-    if (!SS.on && t > SS.next) {
+    if (!SS.on && t > SS.next && STAR_VIS > 0.5) {
       SS.on = true; SS.t0 = t;
       SS.fx = -22 + Math.random() * 44; SS.fy = 15 + Math.random() * 8;
       SS.tx = SS.fx - 9 - Math.random() * 7; SS.ty = SS.fy - 5 - Math.random() * 3;
@@ -3509,7 +3578,7 @@ function animate() {
       if (sf >= 1) { SS.on = false; SS.next = t + 3.5 + Math.random() * 5; SS.sp.material.opacity = 0; }
       else {
         SS.sp.position.set(SS.fx + (SS.tx - SS.fx) * sf, SS.fy + (SS.ty - SS.fy) * sf, 27);
-        SS.sp.material.opacity = Math.sin(sf * Math.PI) * 0.9;
+        SS.sp.material.opacity = Math.sin(sf * Math.PI) * 0.9 * STAR_VIS;
       }
     }
   }
@@ -3549,6 +3618,7 @@ function animate() {
     lg.grp.rotation.x = Math.cos(t * 0.5 + lg.seed * 1.7) * 0.03;
   }
   if (typeof updateOthers === "function") updateOthers(dt);
+  if (SKY_DOME) SKY_DOME.position.copy(camera.position);
   renderer.render(scene, camera);
 }
 /* ================= TUONG TAC: THEM BE / THAM GIAN ================= */
