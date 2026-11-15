@@ -155,7 +155,7 @@ window.__gmLoadSdk = function (cb) {
   .box-lights { position: absolute; left: 8px; bottom: 8px; display: flex; gap: 6px; z-index: 3; }
   .box-lights button { border: none; border-radius: 999px; background: rgba(20,12,4,.55); color: #ffe9bb; font-size: 12.5px; font-weight: 700; padding: 7px 11px; cursor: pointer; font-family: inherit; }
   .box-lights button.on { background: #ffb84d; color: #5b3410; }
-  #petBar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 54px; z-index: 6; display: flex; gap: 7px; align-items: center; background: rgba(30,16,8,.55); border-radius: 999px; padding: 6px 10px; }
+  #petBar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 54px; z-index: 6; display: flex; gap: 7px; align-items: center; background: rgba(30,16,8,.55); border-radius: 999px; padding: 6px 10px; transition: bottom .18s ease; }
   #petBar span { color: #ffe9bb; font-weight: 700; font-size: 13px; padding: 0 4px; white-space: nowrap; }
   #petBar button { border: none; border-radius: 999px; background: rgba(255,255,255,.92); color: #8a2f4f; font-weight: 700; font-size: 13px; padding: 7px 12px; cursor: pointer; font-family: inherit; white-space: nowrap; }
   .pet-row { display: flex; flex-wrap: wrap; gap: 7px; margin: 4px 0 10px; }
@@ -1108,6 +1108,11 @@ function updateContextUI() {
       if (FEED_CD > 0) { fb.textContent = "🐟 " + Math.ceil(FEED_CD) + "s"; fb.style.opacity = "0.55"; }
       else { fb.textContent = "🐟 Cho cá ăn · +3 xu"; fb.style.opacity = "1"; }
     } else fb.style.display = "none";
+  }
+  var pb2 = document.getElementById("petBar");
+  if (pb2 && pb2.style.display !== "none") {
+    var dbv = db && db.style.display !== "none";
+    pb2.style.bottom = dbv ? "202px" : (kn.style.display !== "none" ? "164px" : (act.style.display !== "none" ? "116px" : "54px"));
   }
 }
 function onDoorBtn() {
