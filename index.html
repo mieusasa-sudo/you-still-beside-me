@@ -4565,7 +4565,7 @@ function updateRealPet(dt, t) {
     while (dc > Math.PI) dc -= Math.PI * 2;
     while (dc < -Math.PI) dc += Math.PI * 2;
     g.rotation.y += dc * Math.min(1, dt * 10);
-    P.wrap.rotation.x = -0.85;
+    P.wrap.rotation.x = -0.35;
     PET.beh = "none"; PET.moving01 = 0;
     PET.sitA = petEase(PET.sitA, 0, 6, dt); PET.lieA = petEase(PET.lieA, 0, 6, dt);
     PET.rubA = petEase(PET.rubA, 0, 6, dt); PET.lickA = petEase(PET.lickA, 0, 6, dt);
@@ -4595,14 +4595,14 @@ function updateRealPet(dt, t) {
     var dx = tx - g.position.x, dz = tz - g.position.z;
     var dist = Math.hypot(dx, dz);
     if (PET.sitting && dist > 1.2) { PET.sitting = false; stationary = false; }
-    if (dist > 13 && beh === "none") { g.position.set(fx, avatar.position.y, fz); dist = 0; meow(0.7); }
+    if (dist > 13 && beh === "none") { g.position.set(fx, 0, fz); dist = 0; meow(0.7); }
     var moving = 0;
     if (!stationary && dist > 0.16) {
       PET.idleT = 0;
       PET.sitting = false;
       var sp = Math.min(speedCap, Math.max(0.9, dist * 2.4));
       g.position.x += dx / dist * sp * dt; g.position.z += dz / dist * sp * dt;
-      g.position.y = avatar.position.y;
+      g.position.y += (0 - g.position.y) * Math.min(1, dt * 6);
       var want = Math.atan2(dx / dist, dz / dist);
       var df = want - g.rotation.y;
       while (df > Math.PI) df -= Math.PI * 2;
@@ -4612,6 +4612,7 @@ function updateRealPet(dt, t) {
       moving = Math.min(1, sp / 2.4);
     } else {
       PET.idleT += dt;
+      g.position.y += (0 - g.position.y) * Math.min(1, dt * 6);
       if (beh === "none") {
         var wa = Math.atan2(avatar.position.x - g.position.x, avatar.position.z - g.position.z);
         var df2 = wa - g.rotation.y;
@@ -4644,12 +4645,11 @@ function updateRealPet(dt, t) {
     if (PET.meowT <= 0) { PET.meowT = 24 + Math.random() * 22; if (Math.random() < 0.75) meow(0.55); }
   }
   var clipWant = null;
-  if (PET.mode !== "carry") {
-    if (PET.beh === "alert") clipWant = "Idle_Alert";
+  if (PET.mode === "carry") clipWant = "Sit";
+  else if (PET.beh === "alert") clipWant = "Idle_Alert";
     else if (PET.beh === "fetch") clipWant = "Fetch";
     else if (PET.sitting && (PET.moving01 || 0) < 0.05 && PET.petT <= 0) clipWant = "Sit";
-    else if ((PET.moving01 || 0) < 0.05 && (PET.sitA || 0) < 0.4 && (PET.lieA || 0) < 0.4 && (PET.lickA || 0) < 0.4 && (PET.rubA || 0) < 0.4 && PET.petT <= 0) clipWant = "Idle";
-  }
+  else if ((PET.moving01 || 0) < 0.05 && (PET.sitA || 0) < 0.4 && (PET.lieA || 0) < 0.4 && (PET.lickA || 0) < 0.4 && (PET.rubA || 0) < 0.4 && PET.petT <= 0) clipWant = "Idle";
   petClipSet(PET, clipWant, dt);
   if (PET.petT > 0) {
     PET.petT -= dt;
@@ -4666,11 +4666,11 @@ function stepRealRemotePet(o, dt, t) {
     var ry = o.grp.rotation.y;
     g.position.set(o.grp.position.x + Math.sin(ry) * 0.38, o.grp.position.y + 0.78 + Math.sin(t * 2.1 + rp.seed) * 0.015, o.grp.position.z + Math.cos(ry) * 0.38);
     g.rotation.y = ry;
-    rp.P.wrap.rotation.x = -0.85;
+    rp.P.wrap.rotation.x = -0.35;
     rp.moving01 = 0; rp.beh = "none";
     rp.sitA = petEase(rp.sitA, 0, 6, dt); rp.lieA = petEase(rp.lieA, 0, 6, dt); rp.rubA = petEase(rp.rubA, 0, 6, dt); rp.lickA = petEase(rp.lickA, 0, 6, dt);
     poseRealCat(rp, dt, t);
-    petClipSet(rp, null, dt);
+    petClipSet(rp, "Sit", dt);
     return;
   }
   rp.P.wrap.rotation.x = 0;
@@ -4706,6 +4706,7 @@ function stepRealRemotePet(o, dt, t) {
     moving = Math.min(1, sp / 2.4);
   } else {
     rp.idleT += dt;
+    g.position.y += (0 - g.position.y) * Math.min(1, dt * 6);
     var wa = Math.atan2(o.grp.position.x - g.position.x, o.grp.position.z - g.position.z);
     var df3 = wa - g.rotation.y;
     while (df3 > Math.PI) df3 -= Math.PI * 2;
@@ -4912,13 +4913,13 @@ function updatePet(dt, t) {
     var tz = avatar.position.z - Math.cos(ry) * 0.95 - Math.sin(ry) * 0.5;
     var dx = tx - g.position.x, dz = tz - g.position.z;
     var dist = Math.hypot(dx, dz);
-    if (dist > 13) { g.position.set(tx, avatar.position.y, tz); dist = 0; meow(0.7); }
+    if (dist > 13) { g.position.set(tx, 0, tz); dist = 0; meow(0.7); }
     if (dist > 0.3) {
       PET.idleT = 0; PET.sitting = false;
       var sp = Math.min(5.4, Math.max(1.1, dist * 2.4));
       var vx = dx / dist * sp, vz = dz / dist * sp;
       g.position.x += vx * dt; g.position.z += vz * dt;
-      g.position.y = avatar.position.y;
+      g.position.y += (0 - g.position.y) * Math.min(1, dt * 6);
       var want = Math.atan2(vx, vz);
       var df = want - g.rotation.y;
       while (df > Math.PI) df -= Math.PI * 2;
@@ -4933,6 +4934,7 @@ function updatePet(dt, t) {
       if (PET.petT <= 0) P.head.rotation.z = 0;
     } else {
       PET.idleT += dt;
+      g.position.y += (0 - g.position.y) * Math.min(1, dt * 6);
       for (li = 0; li < 4; li++) P.legs[li].rotation.x *= 0.8;
       P.bodyG.position.y = 0.30 + Math.sin(t * 1.7) * 0.006;
       if (PET.idleT > 2.2) PET.sitting = true;
