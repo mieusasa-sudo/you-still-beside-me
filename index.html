@@ -4486,21 +4486,7 @@ function poseRealCat(st, dt, t) {
   for (var ti = 1; ti <= 5; ti++) {
     add("tail" + ti, Math.sin(t * 2.3 + (st.seed || 0) - ti * 0.65) * 0.06 + 0.05, 0, Math.sin(t * 1.6 + (st.seed || 0) - ti * 0.55) * 0.05 + (ti <= 3 ? (0.38 * sitA + 0.32 * lieA) : 0));
   }
-  if (sitA > 0.01) {
-    add("leg_hind_left_top0", -1.30 * sitA, 0, 0); add("leg_hind_right_top0", -1.30 * sitA, 0, 0);
-    add("leg_hind_left_bot0", 2.05 * sitA, 0, 0); add("leg_hind_right_bot0", 2.05 * sitA, 0, 0);
-    add("leg_front_left_top0", -0.62 * sitA, 0, 0); add("leg_front_right_top0", -0.62 * sitA, 0, 0);
-    add("leg_front_left_ankle", -0.50 * sitA, 0, 0); add("leg_front_right_ankle", -0.50 * sitA, 0, 0);
-    add("pelvis", 0.34 * sitA, 0, 0); add("body", -0.52 * sitA, 0, 0);
-    add("head0", -0.16 * sitA, 0, 0); add("neck0", -0.10 * sitA, 0, 0);
-  }
-  if (lieA > 0.01) {
-    add("leg_front_left_top0", -1.28 * lieA, 0, 0); add("leg_front_right_top0", -1.28 * lieA, 0, 0);
-    add("leg_front_left_bot0", 0.12 * lieA, 0, 0); add("leg_front_right_bot0", 0.12 * lieA, 0, 0);
-    add("leg_hind_left_top0", -0.30 * lieA, 0, 0.8 * lieA); add("leg_hind_right_top0", -0.30 * lieA, 0, -0.8 * lieA);
-    add("leg_hind_left_bot0", 0.45 * lieA, 0, 0); add("leg_hind_right_bot0", 0.45 * lieA, 0, 0);
-    add("head0", (0.34 * (st.sleepA || 0) - 0.04) * lieA, Math.sin(t * 0.4 + (st.seed || 0)) * 0.05 * lieA, 0);
-  }
+  /* Ngoi + nam: DA XOA ban tu che theo yeu cau cua Nhien (2026-11-16) - cho clip that tu nguon ngoai */
   if (st.mode === "carry") {
     add("leg_front_left_top0", 0.14, 0, 0); add("leg_front_right_top0", 0.14, 0, 0);
     add("leg_front_left_bot0", 0.3, 0, 0); add("leg_front_right_bot0", 0.3, 0, 0);
@@ -4634,8 +4620,8 @@ function updateRealPet(dt, t) {
           PET.nextBeh -= dt;
           if (PET.nextBeh <= 0) {
             var rv = Math.random();
-            PET.beh = rv < 0.30 ? "rub" : (rv < 0.50 ? "lick" : (rv < 0.70 ? "lie" : (rv < 0.85 ? "alert" : "fetch")));
-            PET.behT = PET.beh === "rub" ? 5.5 : (PET.beh === "lick" ? 7 : (PET.beh === "lie" ? 10 + Math.random() * 5 : (PET.beh === "alert" ? 3.4 : 2.6)));
+            PET.beh = rv < 0.35 ? "rub" : (rv < 0.60 ? "lick" : (rv < 0.80 ? "alert" : "fetch"));
+            PET.behT = PET.beh === "rub" ? 5.5 : (PET.beh === "lick" ? 7 : (PET.beh === "alert" ? 3.4 : 2.6));
             if (PET.beh === "rub") PET.rubAng = Math.atan2(g.position.x - avatar.position.x, g.position.z - avatar.position.z);
             beh = PET.beh;
           }
@@ -4643,7 +4629,7 @@ function updateRealPet(dt, t) {
       }
     }
     PET.moving01 = moving;
-    var sitT = beh === "lick" ? 1 : (beh === "none" && PET.idleT > 3.5 && moving === 0 ? 1 : 0);
+    var sitT = 0;
     PET.sitA = petEase(PET.sitA, sitT, 5, dt);
     PET.lieA = petEase(PET.lieA, beh === "lie" ? 1 : 0, 3.2, dt);
     PET.rubA = petEase(PET.rubA, beh === "rub" && Math.hypot(avatar.position.x - g.position.x, avatar.position.z - g.position.z) < 0.95 ? 1 : 0, 5, dt);
@@ -4722,7 +4708,7 @@ function stepRealRemotePet(o, dt, t) {
     g.rotation.y += df3 * Math.min(1, dt * 3);
   }
   rp.moving01 = moving;
-  var sitT = beh === "lick" ? 1 : (beh === "none" && rp.idleT > 3.5 && moving === 0 ? 1 : 0);
+  var sitT = 0;
   rp.sitA = petEase(rp.sitA, sitT, 5, dt);
   rp.lieA = petEase(rp.lieA, beh === "lie" ? 1 : 0, 3.2, dt);
   rp.rubA = petEase(rp.rubA, beh === "rub" && Math.hypot(o.grp.position.x - g.position.x, o.grp.position.z - g.position.z) < 0.95 ? 1 : 0, 5, dt);
