@@ -283,7 +283,7 @@ window.__gmLoadSdk = function (cb) {
     <button class="pill" id="floorBtn" onclick="openFloors()">🛗 Tầng 1</button>
   </div>
   <div class="feedbar" id="feed"></div>
-  <div class="hintbar">🖱️ Kéo chuột/ngón tay để xoay camera · WASD hoặc phím mũi tên để đi · Bấm vào một ô trên vách để thăm / đặt chỗ</div>
+  <div class="hintbar">🖱️ Kéo để xoay camera · Chụm 2 ngón / lăn chuột để zoom · WASD hoặc phím mũi tên để đi · Bấm vào một ô trên vách để thăm / đặt chỗ</div>
   <div id="joy"><div id="joyKnob"></div></div>
 
   <div id="petBar" style="display:none">
@@ -3429,12 +3429,29 @@ function bindControls() {
   window.addEventListener("keyup", function(e) { keys[e.code] = false; });
 
   var dragging = false, lastX = 0, lastY = 0, downX = 0, downY = 0, downT = 0, moved = 0;
+  var camPtrs = {}, pinchD = 0;
+  function clampZoom() { if (camDistMul < 0.4) camDistMul = 0.4; if (camDistMul > 2.2) camDistMul = 2.2; }
   el.addEventListener("pointerdown", function(e) {
-    dragging = true; moved = 0;
-    lastX = downX = e.clientX; lastY = downY = e.clientY; downT = Date.now();
-    el.setPointerCapture(e.pointerId);
+    camPtrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+    if (Object.keys(camPtrs).length === 2) {
+      var pp0 = Object.values(camPtrs);
+      pinchD = Math.hypot(pp0[0].x - pp0[1].x, pp0[0].y - pp0[1].y);
+      dragging = false; moved = 99;
+    } else {
+      dragging = true; moved = 0;
+      lastX = downX = e.clientX; lastY = downY = e.clientY; downT = Date.now();
+    }
+    try { el.setPointerCapture(e.pointerId); } catch (err) {}
   });
   el.addEventListener("pointermove", function(e) {
+    if (camPtrs[e.pointerId]) { camPtrs[e.pointerId].x = e.clientX; camPtrs[e.pointerId].y = e.clientY; }
+    if (Object.keys(camPtrs).length === 2) {
+      var pp = Object.values(camPtrs);
+      var nd = Math.hypot(pp[0].x - pp[1].x, pp[0].y - pp[1].y);
+      if (pinchD > 0 && nd > 0) { camDistMul *= pinchD / nd; clampZoom(); }
+      pinchD = nd;
+      return;
+    }
     if (!dragging) return;
     var dx = e.clientX - lastX, dy = e.clientY - lastY;
     lastX = e.clientX; lastY = e.clientY;
@@ -3445,11 +3462,20 @@ function bindControls() {
     if (camPitch > 1.05) camPitch = 1.05;
   });
   el.addEventListener("pointerup", function(e) {
+    var wasPinch = Object.keys(camPtrs).length >= 2;
+    delete camPtrs[e.pointerId];
+    if (Object.keys(camPtrs).length < 2) pinchD = 0;
     dragging = false;
+    if (wasPinch) return;
     var dist = Math.hypot(e.clientX - downX, e.clientY - downY);
     if (dist < 7 && Date.now() - downT < 400) tapAt(e);
   });
-  el.addEventListener("pointercancel", function() { dragging = false; });
+  el.addEventListener("pointercancel", function(e) { delete camPtrs[e.pointerId]; pinchD = 0; dragging = false; });
+  el.addEventListener("wheel", function(e) {
+    e.preventDefault();
+    camDistMul *= Math.exp(e.deltaY * 0.0012);
+    clampZoom();
+  }, { passive: false });
 
   /* joystick cho dien thoai */
   var joy = document.getElementById("joy"), knob = document.getElementById("joyKnob");
@@ -5467,6 +5493,7 @@ function openCreator() {
   document.getElementById("pfCancel").style.display = U.profile ? "" : "none";
   pfBackup.pitch = camPitch;
   pfBackup.lookY = camLookY;
+  pfBackup.distMul = camDistMul;
   camPitch = 0.14;
   camDistMul = 0.6;
   camLookY = 0.35;
@@ -5507,7 +5534,7 @@ function pfRandom() {
 function pfConfirm() {
   if (pfBackup && typeof pfBackup.pitch === "number") camPitch = pfBackup.pitch;
   if (pfBackup && typeof pfBackup.lookY === "number") camLookY = pfBackup.lookY;
-  camDistMul = 1;
+  camDistMul = (pfBackup && typeof pfBackup.distMul === "number") ? pfBackup.distMul : 1;
   pfDraft.name = document.getElementById("pfName").value.trim() || "Trăng Lặng";
   U.profile = { name: pfDraft.name, gender: pfDraft.gender };
   U.colors = { shirt: pfDraft.colors.shirt, hair: pfDraft.colors.hair, skin: pfDraft.colors.skin };
@@ -5521,7 +5548,7 @@ function pfConfirm() {
 function pfCancelEdit() {
   if (pfBackup && typeof pfBackup.pitch === "number") camPitch = pfBackup.pitch;
   if (pfBackup && typeof pfBackup.lookY === "number") camLookY = pfBackup.lookY;
-  camDistMul = 1;
+  camDistMul = (pfBackup && typeof pfBackup.distMul === "number") ? pfBackup.distMul : 1;
   if (pfBackup) {
     U.profile = pfBackup.profile;
     if (pfBackup.colors) U.colors = pfBackup.colors;
